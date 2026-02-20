@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Create a Meeting — beet-scheduler{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h1>Schedule a meeting</h1>
+  <p class="subtitle">Add time options, share the link, collect availability.</p>
+
+  <form method="POST" action="/meetings">
+    <div class="form-group">
+      <label for="title">Meeting title</label>
+      <input type="text" id="title" name="title" placeholder="e.g. Team lunch" required>
+    </div>
+
+    <div class="form-group">
+      <label>Time options</label>
+      <div id="slots-container">
+        <div class="slot-row">
+          <input type="text" name="slot_label[]" placeholder="Label (optional)">
+          <input type="date" name="slot_date[]" required>
+          <input type="time" name="slot_time[]">
+          <button type="button" class="remove-slot btn-secondary">Remove</button>
+        </div>
+        <div class="slot-row">
+          <input type="text" name="slot_label[]" placeholder="Label (optional)">
+          <input type="date" name="slot_date[]" required>
+          <input type="time" name="slot_time[]">
+          <button type="button" class="remove-slot btn-secondary">Remove</button>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="btn-secondary add-slot-btn"
+        hx-get="/slots/new-row"
+        hx-target="#slots-container"
+        hx-swap="beforeend"
+      >+ Add time option</button>
+    </div>
+
+    <button type="submit" class="btn-primary">Create meeting</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-slot')) {
+      const rows = document.querySelectorAll('.slot-row');
+      if (rows.length > 2) {
+        e.target.closest('.slot-row').remove();
+      }
+    }
+  });
+</script>
+{% endblock %}

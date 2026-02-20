@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}{{ view.meeting.title }} — beet-scheduler{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h1>{{ view.meeting.title }}</h1>
+  <p class="subtitle">Share this link with your friends so they can mark their availability.</p>
+
+  <h2>Availability</h2>
+  {% if view.grid | length == 0 %}
+  <p class="empty-state">No responses yet. Be the first!</p>
+  {% endif %}
+
+  <div id="availability-grid">
+    {% include "partials/grid.html" %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Add your availability</h2>
+  <form
+    method="POST"
+    action="/m/{{ view.meeting.id }}/responses"
+    hx-post="/m/{{ view.meeting.id }}/responses"
+    hx-target="#availability-grid"
+    hx-swap="innerHTML"
+  >
+    <div class="form-group">
+      <label for="name">Your name</label>
+      <input type="text" id="name" name="name" placeholder="e.g. Alice" required>
+    </div>
+
+    <div class="form-group">
+      <label>Which times work for you?</label>
+      <div class="slot-checkboxes">
+        {% for slot in view.slots %}
+        <label class="checkbox-label">
+          <input type="checkbox" name="slot_ids[]" value="{{ slot.id }}">
+          <span>{{ slot.label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <button type="submit" class="btn-primary">Submit availability</button>
+  </form>
+</div>
+{% endblock %}

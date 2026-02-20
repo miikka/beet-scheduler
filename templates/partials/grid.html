@@ -1,0 +1,28 @@
+<table class="availability-table">
+  <thead>
+    <tr>
+      <th>Name</th>
+      {% for slot in view.slots %}
+      <th>{{ slot.label }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in view.grid %}
+    <tr>
+      <td class="participant-name">{{ row.participant_name }}</td>
+      {% for avail in row.availability %}
+      <td class="{{ "yes" if avail else "no" }}">{{ "✓" if avail else "✗" }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td class="totals-label">Total</td>
+      {% for count in view.slot_counts %}
+      <td class="total-count">{{ count }}</td>
+      {% endfor %}
+    </tr>
+  </tfoot>
+</table>

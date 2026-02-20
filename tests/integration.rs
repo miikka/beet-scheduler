@@ -66,7 +66,7 @@ async fn test_home_returns_200() {
     assert_eq!(resp.status(), 200);
     let body = resp.text().await.unwrap();
     assert!(body.contains("Schedule a meeting"), "home page missing heading");
-    assert!(body.contains("slot_label"), "home page missing slot inputs");
+    assert!(body.contains("calendar-grid"), "home page missing calendar");
 }
 
 #[tokio::test]

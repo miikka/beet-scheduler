@@ -25,8 +25,15 @@ async fn main() -> anyhow::Result<()> {
 
     let app = build_app(state).layer(TraceLayer::new_for_http());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
-    tracing::info!("Listening on http://localhost:3000");
+    let port: u16 = std::env::args()
+        .nth(1)
+        .as_deref()
+        .unwrap_or("3000")
+        .parse()
+        .map_err(|_| anyhow::anyhow!("Invalid port number"))?;
+
+    let listener = tokio::net::TcpListener::bind(("0.0.0.0", port)).await?;
+    tracing::info!("Listening on http://localhost:{port}");
     axum::serve(listener, app).await?;
 
     Ok(())

@@ -5,37 +5,24 @@
 {% block content %}
 <div class="card">
   <h1>Schedule a meeting</h1>
-  <p class="subtitle">Add time options, share the link, collect availability.</p>
+  <p class="subtitle">Click days to add them as options, then share the link.</p>
 
-  <form method="POST" action="/meetings">
+  <form id="meeting-form" method="POST" action="/meetings">
     <div class="form-group">
       <label for="title">Meeting title</label>
       <input type="text" id="title" name="title" placeholder="e.g. Team lunch" required>
     </div>
 
     <div class="form-group">
-      <label>Time options</label>
-      <div id="slots-container">
-        <div class="slot-row">
-          <input type="text" name="slot_label[]" placeholder="Label (optional)">
-          <input type="date" name="slot_date[]" required>
-          <input type="time" name="slot_time[]">
-          <button type="button" class="remove-slot btn-secondary">Remove</button>
-        </div>
-        <div class="slot-row">
-          <input type="text" name="slot_label[]" placeholder="Label (optional)">
-          <input type="date" name="slot_date[]" required>
-          <input type="time" name="slot_time[]">
-          <button type="button" class="remove-slot btn-secondary">Remove</button>
-        </div>
-      </div>
-      <button
-        type="button"
-        class="btn-secondary add-slot-btn"
-        hx-get="/slots/new-row"
-        hx-target="#slots-container"
-        hx-swap="beforeend"
-      >+ Add time option</button>
+      <label>Select dates</label>
+      <div id="calendar-grid" class="calendar-grid"></div>
+      <p id="no-dates-msg" class="field-error" hidden>Please select at least one date.</p>
+    </div>
+
+    <div class="form-group">
+      <label for="common-time">Time <span class="label-optional">(optional)</span></label>
+      <input type="time" id="common-time" style="width:auto">
+      <p class="field-hint">If given, the same time is applied to every selected date.</p>
     </div>
 
     <button type="submit" class="btn-primary">Create meeting</button>
@@ -45,13 +32,125 @@
 
 {% block scripts %}
 <script>
-  document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('remove-slot')) {
-      const rows = document.querySelectorAll('.slot-row');
-      if (rows.length > 2) {
-        e.target.closest('.slot-row').remove();
-      }
+(function () {
+  var selectedDates = new Set();
+
+  function toISO(date) {
+    var y = date.getFullYear();
+    var m = String(date.getMonth() + 1).padStart(2, '0');
+    var d = String(date.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + d;
+  }
+
+  function buildMonth(year, month, today) {
+    var wrap = document.createElement('div');
+    wrap.className = 'cal-month';
+
+    /* Title */
+    var title = document.createElement('div');
+    title.className = 'cal-month-title';
+    title.textContent = new Date(year, month, 1)
+      .toLocaleString('en', { month: 'long', year: 'numeric' });
+    wrap.appendChild(title);
+
+    /* Day-of-week header */
+    var headerRow = document.createElement('div');
+    headerRow.className = 'cal-row';
+    ['Mo','Tu','We','Th','Fr','Sa','Su'].forEach(function(label) {
+      var cell = document.createElement('div');
+      cell.className = 'cal-cell cal-dow';
+      cell.textContent = label;
+      headerRow.appendChild(cell);
+    });
+    wrap.appendChild(headerRow);
+
+    /* Days */
+    var daysRow = document.createElement('div');
+    daysRow.className = 'cal-row';
+
+    /* Blank cells before day 1 (Mon = 0) */
+    var firstDow = (new Date(year, month, 1).getDay() + 6) % 7;
+    for (var i = 0; i < firstDow; i++) {
+      daysRow.appendChild(Object.assign(document.createElement('div'), { className: 'cal-cell' }));
     }
+
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (var d = 1; d <= daysInMonth; d++) {
+      var date = new Date(year, month, d);
+      var ds = toISO(date);
+      var isPast = date < today;
+      var isToday = date.getTime() === today.getTime();
+
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = d;
+      btn.className = 'cal-cell cal-day' +
+        (isPast   ? ' past'     : '') +
+        (isToday  ? ' today'    : '') +
+        (selectedDates.has(ds) ? ' selected' : '');
+
+      if (isPast) {
+        btn.disabled = true;
+      } else {
+        (function(btn, ds) {
+          btn.addEventListener('click', function() {
+            if (selectedDates.has(ds)) {
+              selectedDates.delete(ds);
+              btn.classList.remove('selected');
+            } else {
+              selectedDates.add(ds);
+              btn.classList.add('selected');
+            }
+          });
+        })(btn, ds);
+      }
+
+      daysRow.appendChild(btn);
+    }
+
+    wrap.appendChild(daysRow);
+    return wrap;
+  }
+
+  function renderCalendars() {
+    var container = document.getElementById('calendar-grid');
+    container.innerHTML = '';
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (var i = 0; i < 3; i++) {
+      var d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+      container.appendChild(buildMonth(d.getFullYear(), d.getMonth(), today));
+    }
+  }
+
+  document.getElementById('meeting-form').addEventListener('submit', function(e) {
+    if (selectedDates.size === 0) {
+      e.preventDefault();
+      document.getElementById('no-dates-msg').hidden = false;
+      return;
+    }
+    document.getElementById('no-dates-msg').hidden = true;
+
+    var time = document.getElementById('common-time').value;
+    var form = this;
+
+    /* Remove any previously injected hidden inputs */
+    form.querySelectorAll('.injected-slot').forEach(function(el) { el.remove(); });
+
+    Array.from(selectedDates).sort().forEach(function(ds) {
+      var di = document.createElement('input');
+      di.type = 'hidden'; di.name = 'slot_date[]'; di.value = ds;
+      di.className = 'injected-slot';
+      form.appendChild(di);
+
+      var ti = document.createElement('input');
+      ti.type = 'hidden'; ti.name = 'slot_time[]'; ti.value = time;
+      ti.className = 'injected-slot';
+      form.appendChild(ti);
+    });
   });
+
+  renderCalendars();
+})();
 </script>
 {% endblock %}

@@ -330,6 +330,27 @@ async fn test_grid_totals_correct() {
 }
 
 #[tokio::test]
+async fn test_meeting_calendar_shows_slot_dates() {
+    let (base, _tmp) = spawn_app().await;
+    // 2026-03-06 = Friday, 2026-03-09 = Monday
+    let id = create_meeting(
+        &base,
+        "title=Cal+View\
+         &slot_label[]=Fri+eve&slot_date[]=2026-03-06&slot_time[]=19:00\
+         &slot_label[]=Mon+morn&slot_date[]=2026-03-09&slot_time[]=09:00",
+    )
+    .await;
+
+    let body = reqwest::get(format!("{}/m/{}", base, id))
+        .await.unwrap().text().await.unwrap();
+
+    // The template injects these ISO dates into the SLOT_DATES Set
+    assert!(body.contains("\"2026-03-06\""), "slot date 2026-03-06 should be in JS");
+    assert!(body.contains("\"2026-03-09\""), "slot date 2026-03-09 should be in JS");
+    assert!(body.contains("meeting-calendar"), "calendar container should be present");
+}
+
+#[tokio::test]
 async fn test_edit_replaces_availability() {
     let (base, _tmp) = spawn_app().await;
     let client = no_redirect_client();

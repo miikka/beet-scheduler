@@ -4,11 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}beet-scheduler{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header class="site-header">
-    <a href="/" class="site-logo">🍒 beet-scheduler</a>
+    <a href="/" class="site-logo">
+      <img src="/static/favicon.svg" alt="" width="24" height="24" class="site-logo-icon">
+      beet-scheduler
+    </a>
   </header>
   <main>
     {% block content %}{% endblock %}

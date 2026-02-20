@@ -37,6 +37,14 @@ body {
   font-size: 1.1rem;
   text-decoration: none;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.site-logo-icon {
+  display: block;
+  flex-shrink: 0;
 }
 
 /* ── Layout ───────────────────────────────────── */
@@ -281,7 +289,7 @@ input[type="datetime-local"]:focus {
   color: var(--text);
   transition: background .1s, color .1s;
 }
-.cal-day:hover:not(:disabled) { background: var(--border); }
+button.cal-day:hover:not(:disabled) { background: var(--border); }
 .cal-day.past { color: var(--border); cursor: default; }
 .cal-day.today { font-weight: 700; box-shadow: inset 0 0 0 2px var(--accent); }
 .cal-day.selected { background: var(--accent); color: #fff; font-weight: 600; }

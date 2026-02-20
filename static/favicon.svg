@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Left leaf -->
+  <ellipse cx="11" cy="10" rx="4.5" ry="7" fill="#65a30d" transform="rotate(-25 11 10)"/>
+  <!-- Right leaf -->
+  <ellipse cx="21" cy="10" rx="4.5" ry="7" fill="#65a30d" transform="rotate(25 21 10)"/>
+  <!-- Centre leaf -->
+  <ellipse cx="16" cy="9" rx="3.5" ry="7" fill="#4d7c0f"/>
+  <!-- Beet body -->
+  <circle cx="16" cy="21" r="9" fill="#be185d"/>
+  <!-- Sheen -->
+  <ellipse cx="13" cy="18" rx="2.5" ry="1.8" fill="#fce7f3" opacity="0.6"/>
+  <!-- Root tail -->
+  <path d="M16 30 Q18.5 33 21 31.5" stroke="#9d174d" stroke-width="1.5"
+        fill="none" stroke-linecap="round"/>
+</svg>

@@ -7,6 +7,9 @@
   <h1>{{ view.meeting.title }}</h1>
   <p class="subtitle">Share this link with your friends so they can mark their availability.</p>
 
+  <h2>Dates</h2>
+  <div id="meeting-calendar" class="calendar-grid"></div>
+
   <h2>Availability</h2>
   <div id="availability-grid">
     {% include "partials/grid.html" %}
@@ -48,18 +51,88 @@
 
 {% block scripts %}
 <script>
+(function () {
+  /* Dates of all time slots, injected by the template */
+  var SLOT_DATES = new Set([
+    {% for slot in view.slots %}"{{ slot.slot_dt[:10] }}"{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]);
+
+  function buildMonth(year, month) {
+    var wrap = document.createElement('div');
+    wrap.className = 'cal-month';
+
+    var title = document.createElement('div');
+    title.className = 'cal-month-title';
+    title.textContent = new Date(year, month, 1)
+      .toLocaleString('en', { month: 'long', year: 'numeric' });
+    wrap.appendChild(title);
+
+    var headerRow = document.createElement('div');
+    headerRow.className = 'cal-row';
+    ['Mo','Tu','We','Th','Fr','Sa','Su'].forEach(function(label) {
+      var cell = document.createElement('div');
+      cell.className = 'cal-cell cal-dow';
+      cell.textContent = label;
+      headerRow.appendChild(cell);
+    });
+    wrap.appendChild(headerRow);
+
+    var daysRow = document.createElement('div');
+    daysRow.className = 'cal-row';
+
+    var firstDow = (new Date(year, month, 1).getDay() + 6) % 7;
+    for (var i = 0; i < firstDow; i++) {
+      daysRow.appendChild(Object.assign(document.createElement('div'), { className: 'cal-cell' }));
+    }
+
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (var d = 1; d <= daysInMonth; d++) {
+      var ds = year + '-' +
+        String(month + 1).padStart(2, '0') + '-' +
+        String(d).padStart(2, '0');
+      var cell = document.createElement('div');
+      cell.className = 'cal-cell cal-day' + (SLOT_DATES.has(ds) ? ' selected' : '');
+      cell.textContent = d;
+      daysRow.appendChild(cell);
+    }
+
+    wrap.appendChild(daysRow);
+    return wrap;
+  }
+
+  function render() {
+    if (SLOT_DATES.size === 0) return;
+
+    var dates = Array.from(SLOT_DATES).sort();
+    var fp = dates[0].split('-'),
+        lp = dates[dates.length - 1].split('-');
+    var y = parseInt(fp[0]), m = parseInt(fp[1]) - 1;
+    var endY = parseInt(lp[0]), endM = parseInt(lp[1]) - 1;
+
+    var container = document.getElementById('meeting-calendar');
+    while (y < endY || (y === endY && m <= endM)) {
+      container.appendChild(buildMonth(y, m));
+      if (++m > 11) { m = 0; y++; }
+    }
+  }
+
+  render();
+})();
+
+  /* Edit-button handler */
   document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.edit-btn');
+    var btn = e.target.closest('.edit-btn');
     if (!btn) return;
 
-    const name = btn.dataset.name;
-    const row = btn.closest('tr');
-    const cells = Array.from(row.querySelectorAll('td')).slice(1);
-    const headers = Array.from(document.querySelectorAll('.availability-table thead th')).slice(1);
+    var name = btn.dataset.name;
+    var row = btn.closest('tr');
+    var cells = Array.from(row.querySelectorAll('td')).slice(1);
+    var headers = Array.from(document.querySelectorAll('.availability-table thead th')).slice(1);
 
     document.getElementById('name').value = name;
 
-    document.querySelectorAll('input[name="slot_ids[]"]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('input[name="slot_ids[]"]').forEach(function(cb) { cb.checked = false; });
     cells.forEach(function(cell, i) {
       if (cell.classList.contains('yes')) {
         var slotId = headers[i] && headers[i].dataset.slotId;

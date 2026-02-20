@@ -62,11 +62,27 @@ pub async fn submit_response(
             return Ok((StatusCode::NOT_FOUND, "Meeting not found").into_response());
         }
 
-        let participant_id: i64 = conn.query_row(
-            "INSERT INTO participants (meeting_id, name) VALUES (?1, ?2) RETURNING id",
-            rusqlite::params![id, form.name.trim()],
-            |row| row.get(0),
-        )?;
+        let existing_id: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM participants WHERE meeting_id = ?1 AND name = ?2",
+                rusqlite::params![id, form.name.trim()],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        let participant_id = if let Some(pid) = existing_id {
+            conn.execute(
+                "DELETE FROM availabilities WHERE participant_id = ?1",
+                rusqlite::params![pid],
+            )?;
+            pid
+        } else {
+            conn.query_row(
+                "INSERT INTO participants (meeting_id, name) VALUES (?1, ?2) RETURNING id",
+                rusqlite::params![id, form.name.trim()],
+                |row| row.get(0),
+            )?
+        };
 
         for slot_id in &form.slot_ids {
             conn.execute(

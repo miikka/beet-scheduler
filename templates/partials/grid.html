@@ -1,16 +1,22 @@
+{% if view.grid | length == 0 %}
+<p class="empty-state">No responses yet. Be the first!</p>
+{% else %}
 <table class="availability-table">
   <thead>
     <tr>
       <th>Name</th>
       {% for slot in view.slots %}
-      <th>{{ slot.label }}</th>
+      <th data-slot-id="{{ slot.id }}">{{ slot.label }}</th>
       {% endfor %}
     </tr>
   </thead>
   <tbody>
     {% for row in view.grid %}
     <tr>
-      <td class="participant-name">{{ row.participant_name }}</td>
+      <td class="participant-name">
+        {{ row.participant_name }}
+        <button type="button" class="edit-btn" data-name="{{ row.participant_name }}">Edit</button>
+      </td>
       {% for avail in row.availability %}
       <td class="{{ "yes" if avail else "no" }}">{{ "✓" if avail else "✗" }}</td>
       {% endfor %}
@@ -26,3 +32,4 @@
     </tr>
   </tfoot>
 </table>
+{% endif %}

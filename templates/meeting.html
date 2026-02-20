@@ -8,23 +8,21 @@
   <p class="subtitle">Share this link with your friends so they can mark their availability.</p>
 
   <h2>Availability</h2>
-  {% if view.grid | length == 0 %}
-  <p class="empty-state">No responses yet. Be the first!</p>
-  {% endif %}
-
   <div id="availability-grid">
     {% include "partials/grid.html" %}
   </div>
 </div>
 
 <div class="card">
-  <h2>Add your availability</h2>
+  <h2>Your availability</h2>
   <form
+    id="response-form"
     method="POST"
     action="/m/{{ view.meeting.id }}/responses"
     hx-post="/m/{{ view.meeting.id }}/responses"
     hx-target="#availability-grid"
     hx-swap="innerHTML"
+    hx-on::after-request="this.reset()"
   >
     <div class="form-group">
       <label for="name">Your name</label>
@@ -43,7 +41,37 @@
       </div>
     </div>
 
-    <button type="submit" class="btn-primary">Submit availability</button>
+    <button type="submit" class="btn-primary">Save availability</button>
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.edit-btn');
+    if (!btn) return;
+
+    const name = btn.dataset.name;
+    const row = btn.closest('tr');
+    const cells = Array.from(row.querySelectorAll('td')).slice(1);
+    const headers = Array.from(document.querySelectorAll('.availability-table thead th')).slice(1);
+
+    document.getElementById('name').value = name;
+
+    document.querySelectorAll('input[name="slot_ids[]"]').forEach(cb => cb.checked = false);
+    cells.forEach(function(cell, i) {
+      if (cell.classList.contains('yes')) {
+        var slotId = headers[i] && headers[i].dataset.slotId;
+        if (slotId) {
+          var cb = document.querySelector('input[name="slot_ids[]"][value="' + slotId + '"]');
+          if (cb) cb.checked = true;
+        }
+      }
+    });
+
+    document.getElementById('name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('name').focus();
+  });
+</script>
 {% endblock %}

@@ -329,6 +329,78 @@ async fn test_grid_totals_correct() {
     assert_eq!(counts, vec!["2", "1"], "slot totals should be [2, 1], got {:?}", counts);
 }
 
+#[tokio::test]
+async fn test_edit_replaces_availability() {
+    let (base, _tmp) = spawn_app().await;
+    let client = no_redirect_client();
+    let id = create_meeting(
+        &base,
+        "title=Edit+Test\
+         &slot_label[]=Slot+A&slot_date[]=2026-03-01&slot_time[]=10:00\
+         &slot_label[]=Slot+B&slot_date[]=2026-03-02&slot_time[]=10:00",
+    )
+    .await;
+
+    let page = reqwest::get(format!("{}/m/{}", base, id))
+        .await.unwrap().text().await.unwrap();
+    let slot_ids = extract_all_slot_ids(&page);
+    let (s1, s2) = (slot_ids[0], slot_ids[1]);
+
+    // Alice first submits slot A only
+    client
+        .post(format!("{}/m/{}/responses", base, id))
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(format!("name=Alice&slot_ids[]={}", s1))
+        .send().await.unwrap();
+
+    // Alice edits: switches to slot B only
+    client
+        .post(format!("{}/m/{}/responses", base, id))
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(format!("name=Alice&slot_ids[]={}", s2))
+        .send().await.unwrap();
+
+    let page = reqwest::get(format!("{}/m/{}", base, id))
+        .await.unwrap().text().await.unwrap();
+
+    // Alice should appear exactly once in the grid
+    let alice_rows = page.matches(r#"data-name="Alice""#).count();
+    assert_eq!(alice_rows, 1, "Alice should appear exactly once after editing");
+
+    // Slot A=0, Slot B=1
+    let counts: Vec<&str> = page
+        .split(r#"class="total-count""#)
+        .skip(1)
+        .map(|s| {
+            let inner = s.trim_start_matches('>');
+            inner[..inner.find('<').unwrap()].trim()
+        })
+        .collect();
+    assert_eq!(counts, vec!["0", "1"], "after edit totals should be [0, 1], got {:?}", counts);
+}
+
+#[tokio::test]
+async fn test_edit_button_present_in_grid() {
+    let (base, _tmp) = spawn_app().await;
+    let client = no_redirect_client();
+    let id = create_meeting(
+        &base,
+        "title=Edit+Btn&slot_label[]=Mon&slot_date[]=2026-03-02&slot_time[]=",
+    )
+    .await;
+
+    client
+        .post(format!("{}/m/{}/responses", base, id))
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body("name=Carol")
+        .send().await.unwrap();
+
+    let page = reqwest::get(format!("{}/m/{}", base, id))
+        .await.unwrap().text().await.unwrap();
+    assert!(page.contains(r#"data-name="Carol""#), "Edit button with data-name should be present");
+    assert!(page.contains("edit-btn"), "edit-btn class should be present");
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

@@ -198,6 +198,19 @@ input[type="datetime-local"]:focus {
   font-weight: 500;
 }
 
+.edit-btn {
+  font-size: .72rem;
+  padding: .15rem .45rem;
+  margin-left: .5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+  cursor: pointer;
+  vertical-align: middle;
+}
+.edit-btn:hover { background: var(--border); color: var(--text); }
+
 .availability-table td.yes {
   background: var(--yes-bg);
   color: var(--yes-text);

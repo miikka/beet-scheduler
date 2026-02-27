@@ -13,7 +13,8 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let db = beet_scheduler::db::open("beet-scheduler.db")?;
+    let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "beet-scheduler.db".to_string());
+    let db = beet_scheduler::db::open(&db_path)?;
 
     let mut env = Environment::new();
     env.set_loader(minijinja::path_loader("templates"));

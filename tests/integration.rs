@@ -50,8 +50,19 @@ async fn create_meeting(base: &str, body: &str) -> String {
         .send()
         .await
         .unwrap();
-    assert_eq!(resp.status(), 303, "create_meeting got non-303: {}", resp.status());
-    let location = resp.headers().get("location").unwrap().to_str().unwrap().to_string();
+    assert_eq!(
+        resp.status(),
+        303,
+        "create_meeting got non-303: {}",
+        resp.status()
+    );
+    let location = resp
+        .headers()
+        .get("location")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
     location.trim_start_matches("/m/").to_string()
 }
 
@@ -65,14 +76,19 @@ async fn test_home_returns_200() {
     let resp = reqwest::get(format!("{}/", base)).await.unwrap();
     assert_eq!(resp.status(), 200);
     let body = resp.text().await.unwrap();
-    assert!(body.contains("Schedule a meeting"), "home page missing heading");
+    assert!(
+        body.contains("Schedule a meeting"),
+        "home page missing heading"
+    );
     assert!(body.contains("calendar-grid"), "home page missing calendar");
 }
 
 #[tokio::test]
 async fn test_new_slot_row_returns_fragment() {
     let (base, _tmp) = spawn_app().await;
-    let resp = reqwest::get(format!("{}/slots/new-row", base)).await.unwrap();
+    let resp = reqwest::get(format!("{}/slots/new-row", base))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
     let body = resp.text().await.unwrap();
     assert!(body.contains(r#"class="slot-row""#));
@@ -108,7 +124,10 @@ async fn test_meeting_page_shows_title_and_labels() {
     let resp = reqwest::get(format!("{}/m/{}", base, id)).await.unwrap();
     assert_eq!(resp.status(), 200);
     let body = resp.text().await.unwrap();
-    assert!(body.contains("My Test Meeting"), "meeting title not in page");
+    assert!(
+        body.contains("My Test Meeting"),
+        "meeting title not in page"
+    );
     assert!(body.contains("Mon 9am"), "explicit label not in page");
     assert!(body.contains("Tue 3pm"), "explicit label not in page");
 }
@@ -148,7 +167,10 @@ async fn test_auto_label_weekday_with_time() {
         .text()
         .await
         .unwrap();
-    assert!(body.contains("Friday 19:00"), "auto label should be 'Friday 19:00'");
+    assert!(
+        body.contains("Friday 19:00"),
+        "auto label should be 'Friday 19:00'"
+    );
 }
 
 #[tokio::test]
@@ -239,7 +261,10 @@ async fn test_submit_response_with_slots() {
         .text()
         .await
         .unwrap();
-    assert!(page.contains("Alice"), "Alice should appear in availability grid");
+    assert!(
+        page.contains("Alice"),
+        "Alice should appear in availability grid"
+    );
 }
 
 #[tokio::test]
@@ -261,9 +286,16 @@ async fn test_htmx_response_returns_partial() {
         .await
         .unwrap();
 
-    assert_eq!(resp.status(), 200, "HTMX response should be 200, not redirect");
+    assert_eq!(
+        resp.status(),
+        200,
+        "HTMX response should be 200, not redirect"
+    );
     let body = resp.text().await.unwrap();
-    assert!(body.contains("availability-table"), "should return grid partial");
+    assert!(
+        body.contains("availability-table"),
+        "should return grid partial"
+    );
     assert!(body.contains("Bob"), "Bob should be in the grid");
 }
 
@@ -326,7 +358,12 @@ async fn test_grid_totals_correct() {
             inner[..end].trim()
         })
         .collect();
-    assert_eq!(counts, vec!["2", "1"], "slot totals should be [2, 1], got {:?}", counts);
+    assert_eq!(
+        counts,
+        vec!["2", "1"],
+        "slot totals should be [2, 1], got {:?}",
+        counts
+    );
 }
 
 #[tokio::test]
@@ -342,12 +379,25 @@ async fn test_meeting_calendar_shows_slot_dates() {
     .await;
 
     let body = reqwest::get(format!("{}/m/{}", base, id))
-        .await.unwrap().text().await.unwrap();
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
 
     // The template injects these ISO dates into the SLOT_DATES Set
-    assert!(body.contains("\"2026-03-06\""), "slot date 2026-03-06 should be in JS");
-    assert!(body.contains("\"2026-03-09\""), "slot date 2026-03-09 should be in JS");
-    assert!(body.contains("meeting-calendar"), "calendar container should be present");
+    assert!(
+        body.contains("\"2026-03-06\""),
+        "slot date 2026-03-06 should be in JS"
+    );
+    assert!(
+        body.contains("\"2026-03-09\""),
+        "slot date 2026-03-09 should be in JS"
+    );
+    assert!(
+        body.contains("meeting-calendar"),
+        "calendar container should be present"
+    );
 }
 
 #[tokio::test]
@@ -363,7 +413,11 @@ async fn test_edit_replaces_availability() {
     .await;
 
     let page = reqwest::get(format!("{}/m/{}", base, id))
-        .await.unwrap().text().await.unwrap();
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
     let slot_ids = extract_all_slot_ids(&page);
     let (s1, s2) = (slot_ids[0], slot_ids[1]);
 
@@ -372,21 +426,32 @@ async fn test_edit_replaces_availability() {
         .post(format!("{}/m/{}/responses", base, id))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(format!("name=Alice&slot_ids[]={}", s1))
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
 
     // Alice edits: switches to slot B only
     client
         .post(format!("{}/m/{}/responses", base, id))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(format!("name=Alice&slot_ids[]={}", s2))
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
 
     let page = reqwest::get(format!("{}/m/{}", base, id))
-        .await.unwrap().text().await.unwrap();
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
 
     // Alice should appear exactly once in the grid
     let alice_rows = page.matches(r#"data-name="Alice""#).count();
-    assert_eq!(alice_rows, 1, "Alice should appear exactly once after editing");
+    assert_eq!(
+        alice_rows, 1,
+        "Alice should appear exactly once after editing"
+    );
 
     // Slot A=0, Slot B=1
     let counts: Vec<&str> = page
@@ -397,7 +462,12 @@ async fn test_edit_replaces_availability() {
             inner[..inner.find('<').unwrap()].trim()
         })
         .collect();
-    assert_eq!(counts, vec!["0", "1"], "after edit totals should be [0, 1], got {:?}", counts);
+    assert_eq!(
+        counts,
+        vec!["0", "1"],
+        "after edit totals should be [0, 1], got {:?}",
+        counts
+    );
 }
 
 #[tokio::test]
@@ -414,12 +484,24 @@ async fn test_edit_button_present_in_grid() {
         .post(format!("{}/m/{}/responses", base, id))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body("name=Carol")
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
 
     let page = reqwest::get(format!("{}/m/{}", base, id))
-        .await.unwrap().text().await.unwrap();
-    assert!(page.contains(r#"data-name="Carol""#), "Edit button with data-name should be present");
-    assert!(page.contains("edit-btn"), "edit-btn class should be present");
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        page.contains(r#"data-name="Carol""#),
+        "Edit button with data-name should be present"
+    );
+    assert!(
+        page.contains("edit-btn"),
+        "edit-btn class should be present"
+    );
 }
 
 // ---------------------------------------------------------------------------

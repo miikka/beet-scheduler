@@ -149,9 +149,8 @@ pub fn load_meeting_view(db: &Db, id: &str) -> Result<Option<MeetingView>, AppEr
         slot.show_date = label_counts.get(slot.label.as_str()).copied().unwrap_or(0) > 1;
     }
 
-    let mut stmt = conn.prepare(
-        "SELECT id, name FROM participants WHERE meeting_id = ?1 ORDER BY id",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT id, name FROM participants WHERE meeting_id = ?1 ORDER BY id")?;
     let participants: Vec<(i64, String)> = stmt
         .query_map(rusqlite::params![id], |row| {
             Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
@@ -161,9 +160,8 @@ pub fn load_meeting_view(db: &Db, id: &str) -> Result<Option<MeetingView>, AppEr
     let mut grid = Vec::new();
     for (pid, name) in &participants {
         let mut availability = vec![false; slots.len()];
-        let mut stmt = conn.prepare(
-            "SELECT slot_id FROM availabilities WHERE participant_id = ?1",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT slot_id FROM availabilities WHERE participant_id = ?1")?;
         let avail_slots: Vec<i64> = stmt
             .query_map(rusqlite::params![pid], |row| row.get(0))?
             .collect::<Result<_, _>>()?;

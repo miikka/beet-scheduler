@@ -1,3 +1,4 @@
+use crate::{db::Db, error::AppError};
 use axum::{
     extract::State,
     response::{IntoResponse, Redirect},
@@ -5,7 +6,6 @@ use axum::{
 use chrono::{NaiveDate, Utc};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::Deserialize;
-use crate::{db::Db, error::AppError};
 
 use super::QsForm;
 

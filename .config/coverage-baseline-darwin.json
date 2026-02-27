@@ -1,0 +1,50 @@
+{
+  "created": "2026-02-27T09:24:28.817422+00:00",
+  "total": {
+    "percent": 85.0828729281768,
+    "covered": 308,
+    "count": 362
+  },
+  "files": {
+    "src/db.rs": {
+      "percent": 98.83720930232556,
+      "covered": 85,
+      "count": 86
+    },
+    "src/error.rs": {
+      "percent": 0.0,
+      "covered": 0,
+      "count": 11
+    },
+    "src/handlers/home.rs": {
+      "percent": 100.0,
+      "covered": 19,
+      "count": 19
+    },
+    "src/handlers/meetings.rs": {
+      "percent": 95.74468085106383,
+      "covered": 45,
+      "count": 47
+    },
+    "src/handlers/mod.rs": {
+      "percent": 83.33333333333334,
+      "covered": 10,
+      "count": 12
+    },
+    "src/handlers/respond.rs": {
+      "percent": 96.32352941176472,
+      "covered": 131,
+      "count": 136
+    },
+    "src/lib.rs": {
+      "percent": 100.0,
+      "covered": 18,
+      "count": 18
+    },
+    "src/main.rs": {
+      "percent": 0.0,
+      "covered": 0,
+      "count": 33
+    }
+  }
+}

@@ -7,13 +7,15 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-            "beet_scheduler=debug,tower_http=debug".parse().unwrap()
-        }))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "beet_scheduler=debug,tower_http=debug".parse().unwrap()),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "beet-scheduler.db".to_string());
+    let db_path =
+        std::env::var("DATABASE_PATH").unwrap_or_else(|_| "beet-scheduler.db".to_string());
     let db = beet_scheduler::db::open(&db_path)?;
 
     let mut env = Environment::new();

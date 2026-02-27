@@ -37,7 +37,10 @@ pub fn build_app(state: AppState) -> Router {
         .route("/slots/new-row", get(handlers::home::new_slot_row))
         .route("/meetings", post(handlers::meetings::create))
         .route("/m/{id}", get(handlers::respond::show_meeting))
-        .route("/m/{id}/responses", post(handlers::respond::submit_response))
+        .route(
+            "/m/{id}/responses",
+            post(handlers::respond::submit_response),
+        )
         .nest_service("/static", ServeDir::new("static"))
         .with_state(state)
 }

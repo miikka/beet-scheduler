@@ -16,5 +16,7 @@ RUN cargo build --release --bin beet-scheduler
 # We do not need the Rust toolchain to run the binary!
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
+COPY --from=builder /app/templates templates
+COPY --from=builder /app/static static
 COPY --from=builder /app/target/release/beet-scheduler /usr/local/bin
 ENTRYPOINT ["/usr/local/bin/beet-scheduler"]

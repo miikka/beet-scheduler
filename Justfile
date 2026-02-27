@@ -1,6 +1,9 @@
 test:
     cargo llvm-cov nextest
 
+run:
+    cargo run
+
 format:
     cargo fmt
 

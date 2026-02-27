@@ -13,6 +13,8 @@ pub struct TimeSlot {
     pub meeting_id: String,
     pub label: String,
     pub slot_dt: String,
+    /// True when multiple slots share the same weekday and the date number should be shown.
+    pub show_date: bool,
 }
 
 #[derive(Debug, Serialize)]

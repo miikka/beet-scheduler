@@ -38,7 +38,7 @@
         {% for slot in view.slots %}
         <label class="checkbox-label">
           <input type="checkbox" name="slot_ids[]" value="{{ slot.id }}">
-          <span>{{ slot.label }}</span>
+          <span>{{ slot.label }}{% if slot.show_date %} {{ slot.slot_dt[8:10] | int }}{% endif %}</span>
         </label>
         {% endfor %}
       </div>

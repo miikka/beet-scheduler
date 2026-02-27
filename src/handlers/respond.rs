@@ -6,6 +6,7 @@ use axum::{
 use minijinja::Environment;
 use rusqlite::OptionalExtension;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{
@@ -127,16 +128,26 @@ pub fn load_meeting_view(db: &Db, id: &str) -> Result<Option<MeetingView>, AppEr
     let mut stmt = conn.prepare(
         "SELECT id, meeting_id, label, slot_dt FROM time_slots WHERE meeting_id = ?1 ORDER BY slot_dt",
     )?;
-    let slots: Vec<TimeSlot> = stmt
+    let mut slots: Vec<TimeSlot> = stmt
         .query_map(rusqlite::params![id], |row| {
             Ok(TimeSlot {
                 id: row.get(0)?,
                 meeting_id: row.get(1)?,
                 label: row.get(2)?,
                 slot_dt: row.get(3)?,
+                show_date: false,
             })
         })?
         .collect::<Result<_, _>>()?;
+
+    // Mark slots that share a label with another slot so the date number can be shown.
+    let mut label_counts: HashMap<String, usize> = HashMap::new();
+    for slot in &slots {
+        *label_counts.entry(slot.label.clone()).or_default() += 1;
+    }
+    for slot in &mut slots {
+        slot.show_date = label_counts.get(slot.label.as_str()).copied().unwrap_or(0) > 1;
+    }
 
     let mut stmt = conn.prepare(
         "SELECT id, name FROM participants WHERE meeting_id = ?1 ORDER BY id",

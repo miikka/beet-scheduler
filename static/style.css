@@ -47,6 +47,13 @@ body {
   flex-shrink: 0;
 }
 
+.site-footer {
+  text-align: center;
+  padding: 2rem;
+  font-size: .85rem;
+  color: var(--text-muted, #888);
+}
+
 /* ── Layout ───────────────────────────────────── */
 main {
   max-width: 720px;

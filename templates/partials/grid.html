@@ -6,7 +6,7 @@
     <tr>
       <th>Name</th>
       {% for slot in view.slots %}
-      <th data-slot-id="{{ slot.id }}">{{ slot.label }}</th>
+      <th data-slot-id="{{ slot.id }}">{{ slot.label }}{% if slot.show_date %} {{ slot.slot_dt[8:10] | int }}{% endif %}</th>
       {% endfor %}
     </tr>
   </thead>

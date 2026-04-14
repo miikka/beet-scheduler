@@ -8,7 +8,7 @@ use axum::{
     response::{IntoResponse, Redirect},
 };
 use chrono::{NaiveDate, Utc};
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use rand::{distr::Alphanumeric, rng, RngExt};
 use serde::Deserialize;
 
 use super::QsForm;
@@ -74,7 +74,7 @@ pub async fn create(
 }
 
 fn generate_id() -> String {
-    thread_rng()
+    rng()
         .sample_iter(Alphanumeric)
         .take(8)
         .map(char::from)

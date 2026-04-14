@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2026 Miikka Koskinen
+#
+# SPDX-License-Identifier: MIT
+
 """
 Compare cargo llvm-cov --json output against a saved baseline.
 

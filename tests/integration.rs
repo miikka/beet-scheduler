@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Miikka Koskinen
+//
+// SPDX-License-Identifier: MIT
+
 use beet_scheduler::{add_globals, build_app, db, AppState};
 use minijinja::Environment;
 use std::sync::Arc;

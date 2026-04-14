@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Miikka Koskinen
+//
+// SPDX-License-Identifier: MIT
+
 use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Miikka Koskinen
+
+SPDX-License-Identifier: MIT
+-->
+
 # Security Issues
 
 Found during a penetration test of the local dev instance.

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Miikka Koskinen
+//
+// SPDX-License-Identifier: MIT
+
 use axum::response::{Html, IntoResponse};
 use minijinja::Environment;
 use std::sync::Arc;

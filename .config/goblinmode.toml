@@ -1,2 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Miikka Koskinen
+#
+# SPDX-License-Identifier: MIT
+
 serve_ports = [3000]
 cargo_packages = ["cargo-llvm-cov", "cargo-nextest"]

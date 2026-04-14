@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Miikka Koskinen
+#
+# SPDX-License-Identifier: MIT
+
 FROM rust:1-bookworm AS builder
 
 WORKDIR /build

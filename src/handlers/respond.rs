@@ -141,12 +141,14 @@ pub fn load_meeting_view(db: &Db, id: &str) -> Result<Option<MeetingView>, AppEr
         .collect::<Result<_, _>>()?;
 
     // Mark slots that share a label with another slot so the date number can be shown.
+    // If any slot needs disambiguation, show dates on all slots for consistency.
     let mut label_counts: HashMap<String, usize> = HashMap::new();
     for slot in &slots {
         *label_counts.entry(slot.label.clone()).or_default() += 1;
     }
+    let any_duplicate = label_counts.values().any(|&c| c > 1);
     for slot in &mut slots {
-        slot.show_date = label_counts.get(slot.label.as_str()).copied().unwrap_or(0) > 1;
+        slot.show_date = any_duplicate;
     }
 
     let mut stmt =

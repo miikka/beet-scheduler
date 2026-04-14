@@ -1,11 +1,16 @@
 {
-  "created": "2026-02-27T09:30:46.504269+00:00",
+  "created": "2026-04-14T05:13:44.258907+00:00",
   "total": {
-    "percent": 85.0828729281768,
-    "covered": 308,
-    "count": 362
+    "percent": 85.49222797927463,
+    "covered": 330,
+    "count": 386
   },
   "files": {
+    "src/config.rs": {
+      "percent": 100.0,
+      "covered": 17,
+      "count": 17
+    },
     "src/db.rs": {
       "percent": 98.83720930232556,
       "covered": 85,
@@ -32,19 +37,19 @@
       "count": 12
     },
     "src/handlers/respond.rs": {
-      "percent": 96.32352941176472,
-      "covered": 131,
-      "count": 136
+      "percent": 96.37681159420289,
+      "covered": 133,
+      "count": 138
     },
     "src/lib.rs": {
       "percent": 100.0,
-      "covered": 18,
-      "count": 18
+      "covered": 21,
+      "count": 21
     },
     "src/main.rs": {
       "percent": 0.0,
       "covered": 0,
-      "count": 33
+      "count": 35
     }
   }
 }

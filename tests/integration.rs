@@ -1,4 +1,4 @@
-use beet_scheduler::{build_app, db, AppState};
+use beet_scheduler::{add_globals, build_app, db, AppState};
 use minijinja::Environment;
 use std::sync::Arc;
 use tempfile::NamedTempFile;
@@ -7,11 +7,16 @@ use tokio::net::TcpListener;
 /// Start the app on a random port and return the base URL.
 /// The TempFile is kept alive for the test duration.
 async fn spawn_app() -> (String, NamedTempFile) {
+    spawn_app_with_snippet("").await
+}
+
+async fn spawn_app_with_snippet(snippet: &str) -> (String, NamedTempFile) {
     let tmp = NamedTempFile::new().expect("temp file");
     let db = db::open(tmp.path().to_str().unwrap()).expect("open db");
 
     let mut env = Environment::new();
     env.set_loader(minijinja::path_loader("templates"));
+    add_globals(&mut env, snippet.to_string());
 
     let state = AppState {
         db,
@@ -502,6 +507,41 @@ async fn test_edit_button_present_in_grid() {
         page.contains("edit-btn"),
         "edit-btn class should be present"
     );
+}
+
+#[tokio::test]
+async fn html_snippet_appears_on_every_page() {
+    let snippet = r#"<script id="test-snippet">/* analytics */</script>"#;
+    let (base, _tmp) = spawn_app_with_snippet(snippet).await;
+
+    let client = reqwest::Client::new();
+
+    let body = client
+        .get(format!("{}/", base))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(body.contains(snippet), "snippet missing from home page");
+
+    // Also verify the snippet appears on a meeting page
+    let meeting_id = create_meeting(
+        &base,
+        "title=Test+Meeting&slot_label%5B%5D=Mon&slot_date%5B%5D=2026-04-14&slot_time%5B%5D=09%3A00",
+    )
+    .await;
+
+    let body = client
+        .get(format!("{}/m/{}", base, meeting_id))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(body.contains(snippet), "snippet missing from meeting page");
 }
 
 // ---------------------------------------------------------------------------

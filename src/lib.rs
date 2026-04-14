@@ -6,6 +6,7 @@ use minijinja::Environment;
 use std::sync::Arc;
 use tower_http::services::ServeDir;
 
+pub mod config;
 pub mod db;
 pub mod error;
 pub mod handlers;
@@ -29,6 +30,12 @@ impl axum::extract::FromRef<AppState> for Arc<Environment<'static>> {
     fn from_ref(state: &AppState) -> Self {
         state.env.clone()
     }
+}
+
+/// Register app-level globals on the minijinja environment.
+/// Call this before wrapping `env` in `Arc`.
+pub fn add_globals(env: &mut Environment<'static>, html_snippet: String) {
+    env.add_global("html_snippet", html_snippet);
 }
 
 pub fn build_app(state: AppState) -> Router {

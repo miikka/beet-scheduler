@@ -1,4 +1,4 @@
-use beet_scheduler::{build_app, AppState};
+use beet_scheduler::{add_globals, build_app, AppState};
 use minijinja::Environment;
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
@@ -14,12 +14,15 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    let app_config = beet_scheduler::config::AppConfig::load()?;
+
     let db_path =
         std::env::var("DATABASE_PATH").unwrap_or_else(|_| "beet-scheduler.db".to_string());
     let db = beet_scheduler::db::open(&db_path)?;
 
     let mut env = Environment::new();
     env.set_loader(minijinja::path_loader("templates"));
+    add_globals(&mut env, app_config.html_snippet);
 
     let state = AppState {
         db,

@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 - **Run**: `cargo run` (serves on `0.0.0.0:3000`, pass port as first arg: `cargo run 8080`)
-- **Test**: `just check` (runs `cargo nextest run`)
+- **Test**: `just check` (runs `cargo fmt --check`, `cargo clippy`, and `cargo llvm-cov nextest` with a coverage gate)
 - **Single test**: `cargo nextest run test_name`
 - **Logging**: `RUST_LOG="beet_scheduler=debug,tower_http=debug"` is the default; override with e.g. `RUST_LOG=trace cargo run`
 

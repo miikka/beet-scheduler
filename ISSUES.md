@@ -10,9 +10,11 @@ Found during a penetration test of the local dev instance.
 
 ---
 
-## MEDIUM: No CSRF protection
+## MEDIUM: No CSRF protection (severity elevated by edit token feature)
 
 Both `POST /meetings` and `POST /m/{id}/responses` accept requests from any origin without a CSRF token. An attacker who can get a meeting participant to visit a malicious page can forge requests on their behalf — silently overwriting their availability or creating spam meetings.
+
+With the edit token feature in place, the severity of this issue has increased: `SameSite=Lax` blocks cross-site `fetch`/XHR but not a regular HTML form POST. A third-party page can therefore forge an authenticated edit (overwriting a token-holder's response) without needing to know the token.
 
 **Reproduce:**
 ```
@@ -22,17 +24,18 @@ curl -X POST http://localhost:3000/m/<id>/responses \
   --data-urlencode "slot_ids[]=1"
 ```
 
-**Fix:** Add CSRF tokens to all state-mutating forms, or set `SameSite=Strict` on a session cookie.
+**Fix:** Add CSRF tokens to all state-mutating forms, or upgrade the edit-token cookie to `SameSite=Strict`.
 
 ---
 
-## MEDIUM: Participant responses can be overwritten by anyone
+## MEDIUM: Edit token cookie missing `Secure` flag
 
-`POST /m/{id}/responses` upserts by name (`src/handlers/respond.rs:65-85`): if a participant named "Alice" already exists, submitting with `name=Alice` from anywhere silently replaces her availability with no authentication required. Combined with the missing CSRF protection above, any visitor can impersonate or erase any existing participant's response.
+The `Set-Cookie` header for the edit token does not include the `Secure` attribute (`src/handlers/respond.rs`). A passive network observer on the same network can capture the token from plain HTTP traffic. The token is the only authentication credential in the system.
 
-**Fix:** Tie responses to a session or secret edit token issued at first submission.
+**Fix:** Add `; Secure` to the `Set-Cookie` format string in `build_set_cookie_header`. This requires TLS termination (reverse proxy or direct TLS) in production.
 
 ---
+
 
 ## LOW: Cross-meeting slot_id injection
 

@@ -31,8 +31,10 @@ pub struct Participant {
 
 #[derive(Debug, Serialize)]
 pub struct GridRow {
+    pub participant_id: i64,
     pub participant_name: String,
     pub availability: Vec<bool>,
+    pub editable: bool,
 }
 
 #[derive(Debug, Serialize)]

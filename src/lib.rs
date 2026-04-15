@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use axum::{
+    http::header,
+    response::IntoResponse,
     routing::{get, post},
     Router,
 };
@@ -42,8 +44,16 @@ pub fn add_globals(env: &mut Environment<'static>, html_snippet: String) {
     env.add_global("html_snippet", html_snippet);
 }
 
+async fn robots_txt() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/plain")],
+        "User-agent: *\nDisallow: /\n",
+    )
+}
+
 pub fn build_app(state: AppState) -> Router {
     Router::new()
+        .route("/robots.txt", get(robots_txt))
         .route("/", get(handlers::home::show))
         .route("/slots/new-row", get(handlers::home::new_slot_row))
         .route("/meetings", post(handlers::meetings::create))

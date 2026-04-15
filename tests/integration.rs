@@ -548,6 +548,19 @@ async fn html_snippet_appears_on_every_page() {
     assert!(body.contains(snippet), "snippet missing from meeting page");
 }
 
+#[tokio::test]
+async fn test_robots_txt() {
+    let (base, _tmp) = spawn_app().await;
+    let resp = reqwest::get(format!("{}/robots.txt", base)).await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body = resp.text().await.unwrap();
+    assert!(
+        body.contains("User-agent: *"),
+        "robots.txt missing User-agent"
+    );
+    assert!(body.contains("Disallow: /"), "robots.txt missing Disallow");
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

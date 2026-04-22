@@ -36,14 +36,14 @@ mod tests {
     fn defaults_to_empty_snippet() {
         // nextest runs each test in its own process so the env is clean,
         // but remove just in case.
-        std::env::remove_var("BEET_HTML_SNIPPET");
+        unsafe { std::env::remove_var("BEET_HTML_SNIPPET") };
         let config = AppConfig::load().expect("load should succeed");
         assert_eq!(config.html_snippet, "");
     }
 
     #[test]
     fn reads_html_snippet_from_env_var() {
-        std::env::set_var("BEET_HTML_SNIPPET", "<script>/* analytics */</script>");
+        unsafe { std::env::set_var("BEET_HTML_SNIPPET", "<script>/* analytics */</script>") };
         let config = AppConfig::load().expect("load should succeed");
         assert_eq!(config.html_snippet, "<script>/* analytics */</script>");
     }

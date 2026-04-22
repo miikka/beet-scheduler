@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: MIT
 
 use axum::{
+    Router,
     http::header,
     response::IntoResponse,
     routing::{get, post},
-    Router,
 };
 use minijinja::Environment;
 use std::sync::Arc;

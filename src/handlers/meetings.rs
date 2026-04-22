@@ -8,7 +8,7 @@ use axum::{
     response::{IntoResponse, Redirect},
 };
 use chrono::{NaiveDate, Utc};
-use rand::{distr::Alphanumeric, rng, RngExt};
+use rand::{RngExt, distr::Alphanumeric, rng};
 use serde::Deserialize;
 
 use super::QsForm;

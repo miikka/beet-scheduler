@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use beet_scheduler::{add_globals, build_app, AppState};
+use beet_scheduler::{AppState, add_globals, build_app};
 use minijinja::Environment;
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;

@@ -111,10 +111,10 @@ fn verify_edit_tokens(
                 |row| row.get(0),
             )
             .optional()?;
-        if let Some(Some(db_token)) = stored {
-            if db_token.as_bytes().ct_eq(cookie_token.as_bytes()).into() {
-                editable.insert(*pid);
-            }
+        if let Some(Some(db_token)) = stored
+            && db_token.as_bytes().ct_eq(cookie_token.as_bytes()).into()
+        {
+            editable.insert(*pid);
         }
     }
     Ok(editable)

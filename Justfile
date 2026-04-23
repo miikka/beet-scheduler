@@ -8,15 +8,19 @@ run:
 test:
     cargo llvm-cov nextest
 
+test-docker:
+    ./tests/docker_test.sh
+
 format:
     cargo fmt
 
 check: ci
 
-ci:
+lint:
     cargo fmt --check
     cargo clippy
-    cargo llvm-cov nextest --json | python3 scripts/check_coverage.py
+
+ci: lint check-cov test-docker
 
 check-cov:
     cargo llvm-cov nextest --json | python3 scripts/check_coverage.py

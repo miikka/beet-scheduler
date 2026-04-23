@@ -4,3 +4,7 @@
 
 fly.toml
 .git/
+Dockerfile
+.dockerignore
+target/
+beet-scheduler.db*

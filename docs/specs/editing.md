@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Miikka Koskinen
+
+SPDX-License-Identifier: MIT
+-->
+
 The users are allowed to edit their availability info (name and time slots).
 
 - Each availability answer (response row) has a randomly-generated _edit token_.

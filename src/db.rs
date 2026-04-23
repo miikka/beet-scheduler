@@ -36,6 +36,8 @@ const MIGRATIONS: &[&str] = &[
          slot_id        INTEGER NOT NULL REFERENCES time_slots(id) ON DELETE CASCADE,
          PRIMARY KEY (participant_id, slot_id)
      );",
+    // 1: add edit_token to participants
+    "ALTER TABLE participants ADD COLUMN edit_token TEXT;",
 ];
 
 pub fn open(path: &str) -> Result<Db> {
@@ -150,5 +152,31 @@ mod tests {
             })
             .unwrap();
         assert_eq!(title, "Test");
+    }
+
+    #[test]
+    fn participants_have_edit_token_column() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_migrations(&conn, MIGRATIONS).unwrap();
+
+        // Should be able to insert with an edit_token and retrieve it
+        conn.execute(
+            "INSERT INTO meetings (id, title, created_at) VALUES ('m1', 'T', '2026-01-01')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO participants (meeting_id, name, edit_token) VALUES ('m1', 'Alice', 'tok')",
+            [],
+        )
+        .unwrap();
+        let token: Option<String> = conn
+            .query_row(
+                "SELECT edit_token FROM participants WHERE name = 'Alice'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(token.as_deref(), Some("tok"));
     }
 }

@@ -31,7 +31,7 @@ SPDX-License-Identifier: MIT
     hx-post="/m/{{ view.meeting.id }}/responses"
     hx-target="#availability-grid"
     hx-swap="innerHTML"
-    hx-on::after-request="this.reset()"
+    hx-on::after-request="this.reset(); document.getElementById('participant-id-hidden').value = '';"
   >
     <div class="form-group">
       <label for="name">Your name</label>
@@ -51,6 +51,7 @@ SPDX-License-Identifier: MIT
     </div>
 
     <button type="submit" class="btn-primary">Save availability</button>
+    <input type="hidden" name="participant_id" id="participant-id-hidden">
   </form>
 </div>
 {% endblock %}
@@ -132,11 +133,13 @@ SPDX-License-Identifier: MIT
     if (!btn) return;
 
     var name = btn.dataset.name;
+    var participantId = btn.dataset.participantId;
     var row = btn.closest('tr');
     var cells = Array.from(row.querySelectorAll('td')).slice(1);
     var headers = Array.from(document.querySelectorAll('.availability-table thead th')).slice(1);
 
     document.getElementById('name').value = name;
+    document.getElementById('participant-id-hidden').value = participantId;
 
     document.querySelectorAll('input[name="slot_ids[]"]').forEach(function(cb) { cb.checked = false; });
     cells.forEach(function(cell, i) {

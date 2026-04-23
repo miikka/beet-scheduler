@@ -21,7 +21,7 @@ SPDX-License-Identifier: MIT
     <tr>
       <td class="participant-name">
         {{ row.participant_name }}
-        <button type="button" class="edit-btn" data-name="{{ row.participant_name }}">Edit</button>
+        {% if row.editable %}<button type="button" class="edit-btn" data-participant-id="{{ row.participant_id }}" data-name="{{ row.participant_name }}">Edit</button>{% endif %}
       </td>
       {% for avail in row.availability %}
       <td class="{{ "yes" if avail else "no" }}">{{ "✓" if avail else "✗" }}</td>

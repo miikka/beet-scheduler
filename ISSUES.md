@@ -6,86 +6,56 @@ SPDX-License-Identifier: MIT
 
 # Security Issues
 
-Found during a penetration test of the local dev instance.
+Source review for a deployment reachable from the open internet. Severity assumes a public service without protective reverse-proxy limits. Findings are based on code paths; no live penetration test was performed.
 
----
+## HIGH: Unauthenticated database growth and application-wide denial of service
 
-## MEDIUM: No CSRF protection (severity elevated by edit token feature)
+Anyone can call `POST /meetings` and `POST /m/{id}/responses` without authentication or rate limits (`src/lib.rs:54-66`). The server does not limit field lengths, numbers of slots or responses, or the number of submitted slot IDs (`src/handlers/meetings.rs:16-71`, `src/handlers/respond.rs:144-235`). The framework's request-body limit does not bound total database growth across requests.
 
-Both `POST /meetings` and `POST /m/{id}/responses` accept requests from any origin without a CSRF token. An attacker who can get a meeting participant to visit a malicious page can forge requests on their behalf — silently overwriting their availability or creating spam meetings.
+Rendering a meeting loads every slot and participant, then checks each slot against that participant's availability with a linear search (`src/handlers/respond.rs:267-355`). This work holds the application's single SQLite connection mutex, so a large attacker-created meeting can delay requests for unrelated meetings. Repeated writes also grow the database and WAL.
 
-With the edit token feature in place, the severity of this issue has increased: `SameSite=Lax` blocks cross-site `fetch`/XHR but not a regular HTML form POST. A third-party page can therefore forge an authenticated edit (overwriting a token-holder's response) without needing to know the token.
+**Fix:** Set server-side limits for field lengths, slots per meeting, participants per meeting, and submitted slot IDs. Rate limit write routes and bound database growth. Replace the nested availability search with a keyed lookup or a bounded SQL query; avoid holding the shared connection lock during expensive computation.
 
-**Reproduce:**
-```
-curl -X POST http://localhost:3000/m/<id>/responses \
-  -H "Origin: http://evil.example.com" \
-  --data-urlencode "name=Alice" \
-  --data-urlencode "slot_ids[]=1"
-```
+## MEDIUM: Duplicate names allow participant impersonation
 
-**Fix:** Add CSRF tokens to all state-mutating forms, or upgrade the edit-token cookie to `SameSite=Strict`.
+Edit tokens protect existing response rows, but a caller without a matching token can submit the same name and create a second row (`src/handlers/respond.rs:205-220`). Anyone with a meeting link can make a response appear to come from another participant and change the displayed totals. This does not overwrite the token-holder's original row.
 
----
+**Fix:** If participant identity is a requirement, use invitations or authentication. Otherwise make duplicate names visibly distinct and explain that names are self-reported.
 
-## MEDIUM: Edit token cookie missing `Secure` flag
+## LOW: Edit-token cookie lacks `Secure`
 
-The `Set-Cookie` header for the edit token does not include the `Secure` attribute (`src/handlers/respond.rs`). A passive network observer on the same network can capture the token from plain HTTP traffic. The token is the only authentication credential in the system.
+The 90-day `edit_tokens` cookie has `HttpOnly` and explicit `SameSite=Lax`, but no `Secure` attribute (`src/handlers/respond.rs:76-81`). If the public service is reachable over HTTP, a network observer can capture the edit credential. The app itself listens on plain HTTP on all interfaces (`src/main.rs:45`); production safety depends on deployment configuration.
 
-**Fix:** Add `; Secure` to the `Set-Cookie` format string in `build_set_cookie_header`. This requires TLS termination (reverse proxy or direct TLS) in production.
+**Fix:** Serve the public endpoint over HTTPS, redirect HTTP to HTTPS, and set `Secure` on the cookie. Make the bind address configurable if the app may run without a reverse proxy.
 
----
+## LOW: Cross-meeting slot IDs can be stored
 
+`submit_response` inserts each submitted `slot_id` without checking that it belongs to the meeting (`src/handlers/respond.rs:224-233`). A valid slot ID from another meeting satisfies the foreign key and creates cross-meeting availability data. The current grid does not display it, but it wastes storage and violates the intended relationship.
 
-## LOW: Cross-meeting slot_id injection
+**Fix:** Validate each slot ID against the target meeting, or insert from a query constrained by `meeting_id`.
 
-`submit_response` inserts into `availabilities` without verifying that the submitted `slot_ids` belong to the target meeting (`src/handlers/respond.rs:87-92`). An attacker submitting to Meeting B can include slot IDs from Meeting A. The orphaned rows are never surfaced in any grid view, so there is no information disclosure, but unconstrained rows accumulate in the DB.
+## LOW: Blank participant names are accepted
 
-**Fix:** Validate that each incoming `slot_id` belongs to the current meeting before inserting:
-```sql
-SELECT id FROM time_slots WHERE id = ?1 AND meeting_id = ?2
-```
+The handler trims `name` but does not reject an empty result (`src/handlers/respond.rs:195-220`). Browser `required` validation is bypassable by a direct request.
 
----
+**Reproduce:** `curl -X POST http://localhost:3000/m/<id>/responses --data-urlencode 'name=   '`
 
-## LOW: No server-side input length limits
+**Fix:** Reject blank names with a client-error response after trimming.
 
-Meeting titles, slot labels, participant names, and slot dates have no maximum length enforced server-side. A 100 000-character title is accepted (HTTP 303). This allows DB bloat and potential memory pressure from large payloads. The `required` / `type="date"` constraints on form inputs are client-side only and trivially bypassed with curl.
+## LOW: Unvalidated dates can break the meeting calendar
 
-**Fix:** Reject requests where any string field exceeds a reasonable limit (e.g. 500 characters for titles/names, 20 characters for dates/times) and return HTTP 422.
+`POST /meetings` accepts arbitrary `slot_date[]` text. A failed date parse only changes the displayed label; the original text is stored in `slot_dt` (`src/handlers/meetings.rs:39-69`). The first ten characters are later placed in the meeting page's JavaScript (`templates/meeting.html:63-65`). Malformed values can cause script syntax errors or unusable calendar ranges. The line breaks in the current template prevent the previously suspected backslash-based script-execution example from working.
 
----
+**Fix:** Reject invalid or out-of-range dates server-side, and serialize dates as JSON for the script.
 
-## LOW: Blank participant names accepted
+## LOW: Missing defensive response headers
 
-A name consisting entirely of whitespace is trimmed to an empty string and stored successfully, creating a nameless participant row. The `required` attribute on the `<input>` only enforces this in the browser.
+The router adds no security response headers (`src/lib.rs:54-67`). A Content Security Policy would provide defense against future script injection once the inline scripts are accommodated. `frame-ancestors` can prevent framing, and `X-Content-Type-Options: nosniff` can prevent MIME sniffing. An explicit `Referrer-Policy` can document the intended handling of meeting URLs; modern browsers generally send only the origin, rather than the full meeting URL, on cross-origin HTTPS requests by default.
 
-**Reproduce:**
-```
-curl -X POST http://localhost:3000/m/<id>/responses --data-urlencode "name=   "
-```
+**Fix:** Add appropriate headers at the app or public reverse proxy and verify that the policy allows required scripts and styles.
 
-**Fix:** After trimming, reject (HTTP 422) if `name` is empty.
+## CSRF assessment
 
----
+The POST routes do not validate `Origin` or use CSRF tokens. This matters if a deployment allows a hostile page on the same *site* (for example, an untrusted sibling subdomain), or if browser cookie behavior changes. However, the edit cookie explicitly uses `SameSite=Lax` (`src/handlers/respond.rs:78`), which generally prevents it from accompanying a cross-site HTML form POST. A cross-site form can still create an unauthenticated response or meeting, but a remote attacker can make those requests directly. The previous claim that an ordinary cross-site form can overwrite a token-holder's row was incorrect.
 
-## LOW: No security response headers
-
-None of the standard defensive headers are set on any response:
-
-| Header | Risk |
-|---|---|
-| `Content-Security-Policy` | No XSS mitigation; HTMX and inline `<script>` blocks are present |
-| `X-Frame-Options` / `frame-ancestors 'none'` | Meeting pages can be embedded in iframes (clickjacking) |
-| `X-Content-Type-Options: nosniff` | MIME-type sniffing by browsers |
-| `Referrer-Policy: same-origin` | Meeting IDs leak to third-party resources via `Referer` |
-
-**Fix:** Add a `tower_http::set_header` or `tower_http::sensitive_headers` layer (or a custom middleware) that appends these headers to every response.
-
----
-
-## LOW: Server binds on 0.0.0.0
-
-`src/main.rs` binds to `0.0.0.0`, exposing the service on all network interfaces. In development this is usually harmless, but if deployed directly it serves unencrypted HTTP to the network with no reverse proxy in front.
-
-**Fix:** Default the bind address to `127.0.0.1` and require an explicit flag or environment variable to expose it more broadly.
+For stronger protection, validate the `Origin` header on state-changing routes or use CSRF tokens. `SameSite=Strict` can be considered for the edit cookie, but it does not replace input validation or abuse controls.

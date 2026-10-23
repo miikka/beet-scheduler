@@ -1,25 +1,25 @@
 {
-  "created": "2026-04-22T07:56:01.890286+00:00",
+  "created": "2026-10-23T01:56:26.032124+00:00",
   "total": {
-    "percent": 85.78680203045685,
-    "covered": 338,
-    "count": 394
+    "percent": 92.71111111111111,
+    "covered": 1043,
+    "count": 1125
   },
   "files": {
     "src/config.rs": {
       "percent": 100.0,
-      "covered": 17,
-      "count": 17
+      "covered": 43,
+      "count": 43
     },
     "src/db.rs": {
-      "percent": 98.83720930232556,
-      "covered": 85,
-      "count": 86
+      "percent": 99.1869918699187,
+      "covered": 244,
+      "count": 246
     },
     "src/error.rs": {
       "percent": 0.0,
       "covered": 0,
-      "count": 11
+      "count": 19
     },
     "src/handlers/home.rs": {
       "percent": 100.0,
@@ -27,21 +27,26 @@
       "count": 19
     },
     "src/handlers/meetings.rs": {
-      "percent": 95.74468085106383,
-      "covered": 45,
-      "count": 47
+      "percent": 97.31543624161074,
+      "covered": 145,
+      "count": 149
     },
     "src/handlers/mod.rs": {
-      "percent": 83.33333333333334,
-      "covered": 10,
+      "percent": 91.66666666666666,
+      "covered": 11,
       "count": 12
     },
     "src/handlers/respond.rs": {
-      "percent": 96.37681159420289,
-      "covered": 133,
-      "count": 138
+      "percent": 98.4375,
+      "covered": 378,
+      "count": 384
     },
     "src/lib.rs": {
+      "percent": 100.0,
+      "covered": 32,
+      "count": 32
+    },
+    "src/limits.rs": {
       "percent": 100.0,
       "covered": 29,
       "count": 29
@@ -49,7 +54,12 @@
     "src/main.rs": {
       "percent": 0.0,
       "covered": 0,
-      "count": 35
+      "count": 50
+    },
+    "src/rate_limit.rs": {
+      "percent": 100.0,
+      "covered": 142,
+      "count": 142
     }
   }
 }

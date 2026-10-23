@@ -16,21 +16,15 @@ Edit tokens protect existing response rows, but a caller without a matching toke
 
 ## LOW: Database size cap can be exhausted
 
-Write routes are rate limited per client and the database has a configurable size cap (`max_db_size_mb`), so growth is bounded. Nothing expires old meetings, though. An attacker with many IP addresses, or a slow attacker over time, can fill the database to the cap, after which all writes fail with 503 until an operator intervenes.
+Write routes are rate limited per client, the database has a configurable size cap (`max_db_size_mb`), and meetings are deleted `retention_days` after their creation or last time slot. An attacker with many IP addresses can still fill the database to the cap within the retention window, after which all writes fail with 503 until old meetings expire or an operator intervenes. Slot dates can be up to two years ahead, so a meeting can be kept for about two years and three months.
 
-**Fix:** Add a retention policy (for example, delete meetings whose slots are all in the past by some margin) and alert when the database approaches the cap.
+**Fix:** Alert when the database approaches the cap.
 
 ## LOW: Edit-token cookie lacks `Secure`
 
 The 90-day `edit_tokens` cookie has `HttpOnly` and explicit `SameSite=Lax`, but no `Secure` attribute (`src/handlers/respond.rs:77-83`). If the public service is reachable over HTTP, a network observer can capture the edit credential. The app itself listens on plain HTTP on all interfaces (`src/main.rs:50`); production safety depends on deployment configuration.
 
 **Fix:** Serve the public endpoint over HTTPS, redirect HTTP to HTTPS, and set `Secure` on the cookie. Make the bind address configurable if the app may run without a reverse proxy.
-
-## LOW: Unvalidated dates can break the meeting calendar
-
-`POST /meetings` accepts arbitrary `slot_date[]` text. A failed date parse only changes the displayed label; the original text is stored in `slot_dt` (`src/handlers/meetings.rs:77-109`). The first ten characters are later placed in the meeting page's JavaScript (`templates/meeting.html:63-65`). Malformed values can cause script syntax errors or unusable calendar ranges. The line breaks in the current template prevent the previously suspected backslash-based script-execution example from working.
-
-**Fix:** Reject invalid or out-of-range dates server-side, and serialize dates as JSON for the script.
 
 ## LOW: Missing defensive response headers
 

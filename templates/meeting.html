@@ -60,10 +60,8 @@ SPDX-License-Identifier: MIT
 <script>
 (function () {
   /* Dates of all time slots, injected by the template */
-  var SLOT_DATES = new Set([
-    {% for slot in view.slots %}"{{ slot.slot_dt[:10] }}"{% if not loop.last %},{% endif %}
-    {% endfor %}
-  ]);
+  var SLOT_DATES = new Set({{ view.slots | map(attribute="slot_dt") | list | tojson }}
+    .map(function (dt) { return dt.slice(0, 10); }));
 
   function buildMonth(year, month) {
     var wrap = document.createElement('div');

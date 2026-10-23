@@ -3,8 +3,12 @@
 // SPDX-License-Identifier: MIT
 
 use anyhow::Result;
+use chrono::{Days, NaiveDate, Utc};
 use rusqlite::Connection;
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 pub type Db = Arc<Mutex<Connection>>;
 
@@ -71,6 +75,43 @@ pub fn is_full(err: &anyhow::Error) -> bool {
         err.downcast_ref::<rusqlite::Error>(),
         Some(rusqlite::Error::SqliteFailure(e, _)) if e.code == rusqlite::ErrorCode::DiskFull
     )
+}
+
+/// Delete meetings that were created before `cutoff` and have no time slot
+/// on or after it. Slots with unparseable dates are ignored. Returns the
+/// number of meetings deleted; their slots and responses cascade.
+pub fn delete_expired(db: &Db, cutoff: NaiveDate) -> Result<usize> {
+    let cutoff = cutoff.format("%Y-%m-%d").to_string();
+    let conn = db.lock().unwrap();
+    let deleted = conn.execute(
+        "DELETE FROM meetings
+         WHERE substr(created_at, 1, 10) < ?1
+           AND NOT EXISTS (
+               SELECT 1 FROM time_slots
+               WHERE time_slots.meeting_id = meetings.id
+                 AND date(substr(slot_dt, 1, 10)) >= ?1
+           )",
+        [cutoff],
+    )?;
+    Ok(deleted)
+}
+
+/// How often `expire_periodically` checks for expired meetings.
+const EXPIRY_INTERVAL: Duration = Duration::from_secs(60 * 60);
+
+/// Every hour, delete meetings that have been inactive for `retention_days`,
+/// measured from the later of their creation and their last time slot.
+pub async fn expire_periodically(db: Db, retention_days: u32) {
+    let mut interval = tokio::time::interval(EXPIRY_INTERVAL);
+    loop {
+        interval.tick().await;
+        let cutoff = Utc::now().date_naive() - Days::new(retention_days.into());
+        match delete_expired(&db, cutoff) {
+            Ok(0) => {}
+            Ok(n) => tracing::info!("Deleted {n} expired meetings"),
+            Err(e) => tracing::error!("Failed to delete expired meetings: {e:#}"),
+        }
+    }
 }
 
 fn run_migrations(conn: &Connection) -> Result<()> {
@@ -196,6 +237,103 @@ mod tests {
             )
             .unwrap_err();
         assert!(is_full(&anyhow::Error::from(err)));
+    }
+
+    fn date(s: &str) -> NaiveDate {
+        NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()
+    }
+
+    fn insert_meeting(db: &Db, id: &str, created_at: &str, slots: &[&str]) {
+        let conn = db.lock().unwrap();
+        conn.execute(
+            "INSERT INTO meetings (id, title, created_at) VALUES (?1, 'T', ?2)",
+            [id, created_at],
+        )
+        .unwrap();
+        for slot in slots {
+            conn.execute(
+                "INSERT INTO time_slots (meeting_id, label, slot_dt) VALUES (?1, 'L', ?2)",
+                [id, slot],
+            )
+            .unwrap();
+        }
+    }
+
+    fn meeting_ids(db: &Db) -> Vec<String> {
+        db.lock()
+            .unwrap()
+            .prepare("SELECT id FROM meetings ORDER BY id")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<std::result::Result<_, _>>()
+            .unwrap()
+    }
+
+    #[test]
+    fn delete_expired_removes_only_inactive_meetings() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let db = open(tmp.path().to_str().unwrap()).unwrap();
+        let old = "2026-01-01T12:00:00+00:00";
+        insert_meeting(&db, "old", old, &["2026-01-10T10:00"]);
+        insert_meeting(&db, "noslots", old, &[]);
+        insert_meeting(&db, "garbage", old, &["not-a-dateT00:00"]);
+        insert_meeting(
+            &db,
+            "future",
+            old,
+            &["2026-01-10T10:00", "2026-06-01T00:00"],
+        );
+        insert_meeting(&db, "recent", "2026-06-01T00:00:00+00:00", &[]);
+
+        let conn = db.lock().unwrap();
+        conn.execute(
+            "INSERT INTO participants (meeting_id, name) VALUES ('old', 'Alice')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO availabilities (participant_id, slot_id)
+             SELECT p.id, s.id FROM participants p, time_slots s WHERE s.meeting_id = 'old'",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let deleted = delete_expired(&db, date("2026-06-01")).unwrap();
+
+        assert_eq!(deleted, 3);
+        assert_eq!(meeting_ids(&db), vec!["future", "recent"]);
+        let conn = db.lock().unwrap();
+        let orphans: u32 = conn
+            .query_row(
+                "SELECT (SELECT COUNT(*) FROM participants WHERE meeting_id = 'old')
+                      + (SELECT COUNT(*) FROM availabilities)
+                      + (SELECT COUNT(*) FROM time_slots WHERE meeting_id = 'old')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(orphans, 0);
+    }
+
+    #[tokio::test]
+    async fn expire_periodically_runs_immediately() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let db = open(tmp.path().to_str().unwrap()).unwrap();
+        insert_meeting(&db, "old", "2000-01-01T00:00:00+00:00", &[]);
+        insert_meeting(&db, "new", &Utc::now().to_rfc3339(), &[]);
+
+        let task = tokio::spawn(expire_periodically(db.clone(), 90));
+        for _ in 0..100 {
+            if meeting_ids(&db) == vec!["new"] {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        task.abort();
+
+        assert_eq!(meeting_ids(&db), vec!["new"]);
     }
 
     #[test]

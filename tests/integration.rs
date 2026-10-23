@@ -410,13 +410,13 @@ async fn test_meeting_calendar_shows_slot_dates() {
         .await
         .unwrap();
 
-    // The template injects these ISO dates into the SLOT_DATES Set
+    // The template injects the slot datetimes into the SLOT_DATES Set
     assert!(
-        body.contains("\"2026-03-06\""),
+        body.contains("\"2026-03-06T19:00\""),
         "slot date 2026-03-06 should be in JS"
     );
     assert!(
-        body.contains("\"2026-03-09\""),
+        body.contains("\"2026-03-09T09:00\""),
         "slot date 2026-03-09 should be in JS"
     );
     assert!(
@@ -971,6 +971,19 @@ async fn test_create_meeting_rejects_too_many_slots() {
     let slots = "&slot_date[]=2026-03-02".repeat(MAX_SLOTS_PER_MEETING);
     let resp = post_form(&base, "/meetings", format!("title=Lunch{slots}")).await;
     assert_eq!(resp.status(), 303);
+}
+
+#[tokio::test]
+async fn test_create_meeting_rejects_invalid_slots() {
+    let (base, _tmp) = spawn_app().await;
+    for slot in [
+        "slot_date[]=2026-02-30",
+        "slot_date[]=9999-12-31",
+        "slot_date[]=2026-03-02&slot_time[]=noon",
+    ] {
+        let resp = post_form(&base, "/meetings", format!("title=Lunch&{slot}")).await;
+        assert_eq!(resp.status(), 422, "{slot}");
+    }
 }
 
 #[tokio::test]

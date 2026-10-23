@@ -17,6 +17,10 @@ pub const MAX_TIME_CHARS: usize = 8;
 pub const MAX_NAME_CHARS: usize = 100;
 
 pub const MAX_SLOTS_PER_MEETING: usize = 100;
+/// Latest allowed slot date, in days from today.
+pub const MAX_SLOT_DAYS_AHEAD: u64 = 2 * 366;
+/// Largest allowed gap between a meeting's earliest and latest slot dates.
+pub const MAX_SLOT_SPAN_DAYS: i64 = 366;
 pub const MAX_PARTICIPANTS_PER_MEETING: usize = 200;
 
 /// Reject `value` if it is longer than `max` characters.

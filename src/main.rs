@@ -24,6 +24,12 @@ async fn main() -> anyhow::Result<()> {
         std::env::var("DATABASE_PATH").unwrap_or_else(|_| "beet-scheduler.db".to_string());
     let db = beet_scheduler::db::open(&db_path)?;
     beet_scheduler::db::set_max_size(&db, app_config.max_db_size_mb * 1024 * 1024)?;
+    if app_config.retention_days > 0 {
+        tokio::spawn(beet_scheduler::db::expire_periodically(
+            db.clone(),
+            app_config.retention_days,
+        ));
+    }
 
     let mut env = Environment::new();
     env.set_loader(minijinja::path_loader("templates"));

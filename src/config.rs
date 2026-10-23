@@ -28,6 +28,11 @@ pub struct AppConfig {
     /// once the limit is reached.
     #[serde(default = "default_max_db_size_mb")]
     pub max_db_size_mb: u64,
+
+    /// Delete meetings this many days after their creation or last time
+    /// slot, whichever is later. 0 keeps meetings forever.
+    #[serde(default = "default_retention_days")]
+    pub retention_days: u32,
 }
 
 fn default_write_rate_limit_per_minute() -> u32 {
@@ -36,6 +41,10 @@ fn default_write_rate_limit_per_minute() -> u32 {
 
 fn default_max_db_size_mb() -> u64 {
     1024
+}
+
+fn default_retention_days() -> u32 {
+    90
 }
 
 impl AppConfig {
@@ -64,6 +73,7 @@ mod tests {
         assert_eq!(config.write_rate_limit_per_minute, 30);
         assert!(!config.trust_forwarded_for);
         assert_eq!(config.max_db_size_mb, 1024);
+        assert_eq!(config.retention_days, 90);
     }
 
     #[test]
@@ -72,11 +82,13 @@ mod tests {
             std::env::set_var("BEET_WRITE_RATE_LIMIT_PER_MINUTE", "5");
             std::env::set_var("BEET_TRUST_FORWARDED_FOR", "true");
             std::env::set_var("BEET_MAX_DB_SIZE_MB", "64");
+            std::env::set_var("BEET_RETENTION_DAYS", "0");
         }
         let config = AppConfig::load().expect("load should succeed");
         assert_eq!(config.write_rate_limit_per_minute, 5);
         assert!(config.trust_forwarded_for);
         assert_eq!(config.max_db_size_mb, 64);
+        assert_eq!(config.retention_days, 0);
     }
 
     #[test]

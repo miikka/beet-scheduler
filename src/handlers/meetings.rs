@@ -2,10 +2,18 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{db::Db, error::AppError};
+use crate::{
+    db::Db,
+    error::AppError,
+    limits::{
+        MAX_DATE_CHARS, MAX_LABEL_CHARS, MAX_SLOTS_PER_MEETING, MAX_TIME_CHARS, MAX_TITLE_CHARS,
+        check_all, check_len,
+    },
+};
 use axum::{
     extract::State,
-    response::{IntoResponse, Redirect},
+    http::StatusCode,
+    response::{IntoResponse, Redirect, Response},
 };
 use chrono::{NaiveDate, Utc};
 use rand::{RngExt, distr::Alphanumeric, rng};
@@ -23,14 +31,44 @@ pub struct CreateMeetingForm {
     pub slot_time: Vec<String>,
 }
 
+impl CreateMeetingForm {
+    fn validate(&self) -> Result<(), String> {
+        check_len("title", &self.title, MAX_TITLE_CHARS)?;
+        check_all(
+            "slot_label",
+            &self.slot_label,
+            MAX_SLOTS_PER_MEETING,
+            MAX_LABEL_CHARS,
+        )?;
+        check_all(
+            "slot_date",
+            &self.slot_date,
+            MAX_SLOTS_PER_MEETING,
+            MAX_DATE_CHARS,
+        )?;
+        check_all(
+            "slot_time",
+            &self.slot_time,
+            MAX_SLOTS_PER_MEETING,
+            MAX_TIME_CHARS,
+        )?;
+        Ok(())
+    }
+}
+
 pub async fn create(
     State(db): State<Db>,
     QsForm(form): QsForm<CreateMeetingForm>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<Response, AppError> {
+    if let Err(msg) = form.validate() {
+        return Ok((StatusCode::UNPROCESSABLE_ENTITY, msg).into_response());
+    }
+
     let id = generate_id();
     let now = Utc::now().to_rfc3339();
 
-    let conn = db.lock().unwrap();
+    let mut conn = db.lock().unwrap();
+    let conn = conn.transaction()?;
     conn.execute(
         "INSERT INTO meetings (id, title, created_at) VALUES (?1, ?2, ?3)",
         rusqlite::params![id, form.title, now],
@@ -69,8 +107,9 @@ pub async fn create(
             rusqlite::params![id, label, slot_dt],
         )?;
     }
+    conn.commit()?;
 
-    Ok(Redirect::to(&format!("/m/{}", id)))
+    Ok(Redirect::to(&format!("/m/{}", id)).into_response())
 }
 
 fn generate_id() -> String {

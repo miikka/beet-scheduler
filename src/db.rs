@@ -38,16 +38,39 @@ const MIGRATIONS: &[&str] = &[
      );",
     // 1: add edit_token to participants
     "ALTER TABLE participants ADD COLUMN edit_token TEXT;",
+    // 2: index lookups by meeting
+    "CREATE INDEX IF NOT EXISTS time_slots_meeting_id ON time_slots(meeting_id);
+     CREATE INDEX IF NOT EXISTS participants_meeting_id ON participants(meeting_id);",
 ];
+
+/// The WAL file is truncated to this size after checkpoints.
+const JOURNAL_SIZE_LIMIT_BYTES: u64 = 64 * 1024 * 1024;
 
 pub fn open(path: &str) -> Result<Db> {
     let conn = Connection::open(path)?;
-    conn.execute_batch(
+    conn.execute_batch(&format!(
         "PRAGMA journal_mode=WAL;
-         PRAGMA foreign_keys=ON;",
-    )?;
+             PRAGMA foreign_keys=ON;
+             PRAGMA journal_size_limit={JOURNAL_SIZE_LIMIT_BYTES};"
+    ))?;
     run_migrations(&conn)?;
     Ok(Arc::new(Mutex::new(conn)))
+}
+
+/// Cap the database file size. Writes beyond it fail with `SQLITE_FULL`.
+pub fn set_max_size(db: &Db, max_bytes: u64) -> Result<()> {
+    let conn = db.lock().unwrap();
+    let page_size: u64 = conn.pragma_query_value(None, "page_size", |row| row.get(0))?;
+    conn.pragma_update(None, "max_page_count", max_bytes / page_size)?;
+    Ok(())
+}
+
+/// True if `err` was caused by the database reaching its size limit.
+pub fn is_full(err: &anyhow::Error) -> bool {
+    matches!(
+        err.downcast_ref::<rusqlite::Error>(),
+        Some(rusqlite::Error::SqliteFailure(e, _)) if e.code == rusqlite::ErrorCode::DiskFull
+    )
 }
 
 fn run_migrations(conn: &Connection) -> Result<()> {
@@ -152,6 +175,27 @@ mod tests {
             })
             .unwrap();
         assert_eq!(title, "Test");
+    }
+
+    #[test]
+    fn set_max_size_rejects_writes_past_limit() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let db = open(tmp.path().to_str().unwrap()).unwrap();
+        set_max_size(&db, 64 * 1024).unwrap();
+        let conn = db.lock().unwrap();
+        conn.execute(
+            "INSERT INTO meetings (id, title, created_at) VALUES ('m1', 'T', '2026-01-01')",
+            [],
+        )
+        .unwrap();
+        let big = "x".repeat(1024 * 1024);
+        let err = conn
+            .execute(
+                "INSERT INTO time_slots (meeting_id, label, slot_dt) VALUES ('m1', ?1, '')",
+                [&big],
+            )
+            .unwrap_err();
+        assert!(is_full(&anyhow::Error::from(err)));
     }
 
     #[test]

@@ -25,7 +25,7 @@ where
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
         let bytes = Bytes::from_request(req, state)
             .await
-            .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+            .map_err(|e| (e.status(), e.body_text()))?;
         serde_qs::Config::new(5, false)
             .deserialize_bytes(&bytes)
             .map(QsForm)

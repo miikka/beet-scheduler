@@ -14,6 +14,28 @@ pub struct AppConfig {
     /// from user input, as it is rendered unescaped into every page.
     #[serde(default)]
     pub html_snippet: String,
+
+    /// Maximum POST requests per client per minute. 0 disables rate limiting.
+    #[serde(default = "default_write_rate_limit_per_minute")]
+    pub write_rate_limit_per_minute: u32,
+
+    /// Identify clients by the last `X-Forwarded-For` entry instead of the
+    /// connection's peer address. Enable only behind a reverse proxy that sets it.
+    #[serde(default)]
+    pub trust_forwarded_for: bool,
+
+    /// Maximum size of the SQLite database file in megabytes. Writes fail
+    /// once the limit is reached.
+    #[serde(default = "default_max_db_size_mb")]
+    pub max_db_size_mb: u64,
+}
+
+fn default_write_rate_limit_per_minute() -> u32 {
+    30
+}
+
+fn default_max_db_size_mb() -> u64 {
+    1024
 }
 
 impl AppConfig {
@@ -39,6 +61,22 @@ mod tests {
         unsafe { std::env::remove_var("BEET_HTML_SNIPPET") };
         let config = AppConfig::load().expect("load should succeed");
         assert_eq!(config.html_snippet, "");
+        assert_eq!(config.write_rate_limit_per_minute, 30);
+        assert!(!config.trust_forwarded_for);
+        assert_eq!(config.max_db_size_mb, 1024);
+    }
+
+    #[test]
+    fn reads_limits_from_env_vars() {
+        unsafe {
+            std::env::set_var("BEET_WRITE_RATE_LIMIT_PER_MINUTE", "5");
+            std::env::set_var("BEET_TRUST_FORWARDED_FOR", "true");
+            std::env::set_var("BEET_MAX_DB_SIZE_MB", "64");
+        }
+        let config = AppConfig::load().expect("load should succeed");
+        assert_eq!(config.write_rate_limit_per_minute, 5);
+        assert!(config.trust_forwarded_for);
+        assert_eq!(config.max_db_size_mb, 64);
     }
 
     #[test]

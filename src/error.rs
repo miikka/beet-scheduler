@@ -11,6 +11,14 @@ pub struct AppError(pub anyhow::Error);
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        if crate::db::is_full(&self.0) {
+            tracing::error!("Database size limit reached: {:?}", self.0);
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Storage limit reached, please try again later",
+            )
+                .into_response();
+        }
         tracing::error!("Internal error: {:?}", self.0);
         (
             StatusCode::INTERNAL_SERVER_ERROR,

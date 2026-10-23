@@ -4,7 +4,9 @@
 
 use axum::{
     Router,
+    extract::DefaultBodyLimit,
     http::header,
+    middleware,
     response::IntoResponse,
     routing::{get, post},
 };
@@ -16,14 +18,18 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod handlers;
+pub mod limits;
 pub mod models;
+pub mod rate_limit;
 
 use db::Db;
+use rate_limit::RateLimiter;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: Db,
     pub env: Arc<Environment<'static>>,
+    pub rate_limiter: Arc<RateLimiter>,
 }
 
 impl axum::extract::FromRef<AppState> for Db {
@@ -63,5 +69,10 @@ pub fn build_app(state: AppState) -> Router {
             post(handlers::respond::submit_response),
         )
         .nest_service("/static", ServeDir::new("static"))
+        .layer(DefaultBodyLimit::max(limits::MAX_BODY_BYTES))
+        .layer(middleware::from_fn_with_state(
+            state.rate_limiter.clone(),
+            rate_limit::limit_writes,
+        ))
         .with_state(state)
 }

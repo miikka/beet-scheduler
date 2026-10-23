@@ -2,9 +2,15 @@
 //
 // SPDX-License-Identifier: MIT
 
-use beet_scheduler::{AppState, add_globals, build_app, db};
+use beet_scheduler::{
+    AppState, add_globals, build_app, db,
+    limits::{
+        MAX_NAME_CHARS, MAX_PARTICIPANTS_PER_MEETING, MAX_SLOTS_PER_MEETING, MAX_TITLE_CHARS,
+    },
+    rate_limit::RateLimiter,
+};
 use minijinja::Environment;
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 use tempfile::NamedTempFile;
 use tokio::net::TcpListener;
 
@@ -15,6 +21,10 @@ async fn spawn_app() -> (String, NamedTempFile) {
 }
 
 async fn spawn_app_with_snippet(snippet: &str) -> (String, NamedTempFile) {
+    spawn_app_with(snippet, RateLimiter::new(0, false)).await
+}
+
+async fn spawn_app_with(snippet: &str, rate_limiter: RateLimiter) -> (String, NamedTempFile) {
     let tmp = NamedTempFile::new().expect("temp file");
     let db = db::open(tmp.path().to_str().unwrap()).expect("open db");
 
@@ -25,6 +35,7 @@ async fn spawn_app_with_snippet(snippet: &str) -> (String, NamedTempFile) {
     let state = AppState {
         db,
         env: Arc::new(env),
+        rate_limiter: Arc::new(rate_limiter),
     };
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -32,7 +43,12 @@ async fn spawn_app_with_snippet(snippet: &str) -> (String, NamedTempFile) {
     let base = format!("http://{}", addr);
 
     tokio::spawn(async move {
-        axum::serve(listener, build_app(state)).await.unwrap();
+        axum::serve(
+            listener,
+            build_app(state).into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .unwrap();
     });
 
     (base, tmp)
@@ -922,6 +938,144 @@ async fn test_robots_txt() {
 
 // ---------------------------------------------------------------------------
 // Helpers
+async fn post_form(base: &str, path: &str, body: String) -> reqwest::Response {
+    no_redirect_client()
+        .post(format!("{}{}", base, path))
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn test_create_meeting_rejects_long_title() {
+    let (base, _tmp) = spawn_app().await;
+    let title = "x".repeat(MAX_TITLE_CHARS + 1);
+    let resp = post_form(
+        &base,
+        "/meetings",
+        format!("title={title}&slot_date[]=2026-03-02"),
+    )
+    .await;
+    assert_eq!(resp.status(), 422);
+}
+
+#[tokio::test]
+async fn test_create_meeting_rejects_too_many_slots() {
+    let (base, _tmp) = spawn_app().await;
+    let slots = "&slot_date[]=2026-03-02".repeat(MAX_SLOTS_PER_MEETING + 1);
+    let resp = post_form(&base, "/meetings", format!("title=Lunch{slots}")).await;
+    assert_eq!(resp.status(), 422);
+
+    let slots = "&slot_date[]=2026-03-02".repeat(MAX_SLOTS_PER_MEETING);
+    let resp = post_form(&base, "/meetings", format!("title=Lunch{slots}")).await;
+    assert_eq!(resp.status(), 303);
+}
+
+#[tokio::test]
+async fn test_create_meeting_rejects_oversized_body() {
+    let (base, _tmp) = spawn_app().await;
+    let title = "x".repeat(beet_scheduler::limits::MAX_BODY_BYTES);
+    let resp = post_form(&base, "/meetings", format!("title={title}")).await;
+    assert_eq!(resp.status(), 413);
+}
+
+#[tokio::test]
+async fn test_submit_response_rejects_blank_and_long_names() {
+    let (base, _tmp) = spawn_app().await;
+    let id = create_meeting(&base, "title=Lunch&slot_date[]=2026-03-02").await;
+    let path = format!("/m/{id}/responses");
+
+    let resp = post_form(&base, &path, "name=+++".to_string()).await;
+    assert_eq!(resp.status(), 422);
+
+    let name = "x".repeat(MAX_NAME_CHARS + 1);
+    let resp = post_form(&base, &path, format!("name={name}")).await;
+    assert_eq!(resp.status(), 422);
+}
+
+#[tokio::test]
+async fn test_submit_response_rejects_too_many_slot_ids() {
+    let (base, _tmp) = spawn_app().await;
+    let id = create_meeting(&base, "title=Lunch&slot_date[]=2026-03-02").await;
+    let slot_ids = "&slot_ids[]=1".repeat(MAX_SLOTS_PER_MEETING + 1);
+    let resp = post_form(
+        &base,
+        &format!("/m/{id}/responses"),
+        format!("name=A{slot_ids}"),
+    )
+    .await;
+    assert_eq!(resp.status(), 422);
+}
+
+#[tokio::test]
+async fn test_submit_response_caps_participants() {
+    let (base, _tmp) = spawn_app().await;
+    let id = create_meeting(&base, "title=Lunch&slot_date[]=2026-03-02").await;
+    let path = format!("/m/{id}/responses");
+    for i in 0..MAX_PARTICIPANTS_PER_MEETING {
+        let resp = post_form(&base, &path, format!("name=P{i}")).await;
+        assert_eq!(resp.status(), 303);
+    }
+    let resp = post_form(&base, &path, "name=Overflow".to_string()).await;
+    assert_eq!(resp.status(), 422);
+}
+
+#[tokio::test]
+async fn test_submit_response_ignores_other_meetings_slots() {
+    let (base, tmp) = spawn_app().await;
+    let a = create_meeting(&base, "title=A&slot_date[]=2026-03-02").await;
+    let b = create_meeting(&base, "title=B&slot_date[]=2026-03-03").await;
+    let slot_of = |id: String| {
+        let base = base.clone();
+        async move {
+            let page = reqwest::get(format!("{base}/m/{id}"))
+                .await
+                .unwrap()
+                .text()
+                .await
+                .unwrap();
+            extract_first_slot_id(&page)
+        }
+    };
+    let slot_a = slot_of(a.clone()).await;
+    let slot_b = slot_of(b).await;
+
+    let resp = post_form(
+        &base,
+        &format!("/m/{a}/responses"),
+        format!("name=Alice&slot_ids[]={slot_a}&slot_ids[]={slot_b}"),
+    )
+    .await;
+    assert_eq!(resp.status(), 303);
+
+    let conn = rusqlite::Connection::open(tmp.path()).unwrap();
+    let stored: Vec<i64> = conn
+        .prepare("SELECT slot_id FROM availabilities")
+        .unwrap()
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(stored, vec![slot_a]);
+}
+
+#[tokio::test]
+async fn test_writes_are_rate_limited() {
+    let (base, _tmp) = spawn_app_with("", RateLimiter::new(2, false)).await;
+    let body = || "title=Lunch&slot_date[]=2026-03-02".to_string();
+    assert_eq!(post_form(&base, "/meetings", body()).await.status(), 303);
+    assert_eq!(post_form(&base, "/meetings", body()).await.status(), 303);
+    let resp = post_form(&base, "/meetings", body()).await;
+    assert_eq!(resp.status(), 429);
+    assert!(resp.headers().contains_key("retry-after"));
+
+    // Reads are not limited.
+    let resp = reqwest::get(format!("{base}/")).await.unwrap();
+    assert_eq!(resp.status(), 200);
+}
+
 // ---------------------------------------------------------------------------
 
 /// Count how many participant-name cells in the grid contain `name`.

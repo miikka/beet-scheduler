@@ -19,7 +19,7 @@ pub async fn show(
 pub async fn new_slot_row() -> impl IntoResponse {
     Html(
         r#"<div class="slot-row">
-  <input type="text" name="slot_label[]" placeholder="Label (optional)">
+  <input type="text" name="slot_label[]" placeholder="Label (optional)" maxlength="100">
   <input type="date" name="slot_date[]" required>
   <input type="time" name="slot_time[]">
   <button type="button" class="remove-slot btn-secondary">Remove</button>

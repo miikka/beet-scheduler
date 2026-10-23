@@ -18,6 +18,7 @@ use std::sync::Arc;
 use crate::{
     db::Db,
     error::AppError,
+    limits::{MAX_NAME_CHARS, MAX_PARTICIPANTS_PER_MEETING, MAX_SLOTS_PER_MEETING, check_len},
     models::{GridRow, Meeting, MeetingView, TimeSlot},
 };
 
@@ -149,6 +150,22 @@ pub struct SubmitResponseForm {
     pub participant_id: Option<i64>,
 }
 
+impl SubmitResponseForm {
+    fn validate(&self) -> Result<(), String> {
+        let name = self.name.trim();
+        if name.is_empty() {
+            return Err("name must not be blank".to_string());
+        }
+        check_len("name", name, MAX_NAME_CHARS)?;
+        if self.slot_ids.len() > MAX_SLOTS_PER_MEETING {
+            return Err(format!(
+                "at most {MAX_SLOTS_PER_MEETING} slot_ids values are allowed"
+            ));
+        }
+        Ok(())
+    }
+}
+
 pub async fn submit_response(
     State(db): State<Db>,
     State(env): State<Arc<Environment<'static>>>,
@@ -156,10 +173,15 @@ pub async fn submit_response(
     headers: HeaderMap,
     QsForm(form): QsForm<SubmitResponseForm>,
 ) -> Result<Response, AppError> {
+    if let Err(msg) = form.validate() {
+        return Ok((StatusCode::UNPROCESSABLE_ENTITY, msg).into_response());
+    }
+    let name = form.name.trim();
     let mut edit_tokens = parse_edit_tokens(&headers);
 
     {
-        let conn = db.lock().unwrap();
+        let mut conn = db.lock().unwrap();
+        let conn = conn.transaction()?;
 
         // Verify meeting exists
         let exists: bool = conn
@@ -175,7 +197,7 @@ pub async fn submit_response(
             return Ok((StatusCode::NOT_FOUND, "Meeting not found").into_response());
         }
 
-        let pid: i64 = if let Some(form_pid) = form.participant_id {
+        let editable_pid: Option<i64> = if let Some(form_pid) = form.participant_id {
             // Token-based edit: participant_id explicitly provided in form
             let stored: Option<Option<String>> = conn
                 .query_row(
@@ -192,46 +214,66 @@ pub async fn submit_response(
                         .is_some_and(|ct| ct.as_bytes().ct_eq(db_tok.as_bytes()).into())
                 })
                 .unwrap_or(false);
-            if token_valid {
-                conn.execute(
-                    "UPDATE participants SET name = ?1 WHERE id = ?2",
-                    rusqlite::params![form.name.trim(), form_pid],
-                )?;
-                form_pid
-            } else {
-                insert_participant(&conn, &id, form.name.trim(), &mut edit_tokens)?
-            }
+            token_valid.then_some(form_pid)
         } else {
             // Name-based: look up existing participant
             let existing: Option<(i64, Option<String>)> = conn
                 .query_row(
                     "SELECT id, edit_token FROM participants WHERE meeting_id = ?1 AND name = ?2",
-                    rusqlite::params![id, form.name.trim()],
+                    rusqlite::params![id, name],
                     |row| Ok((row.get(0)?, row.get(1)?)),
                 )
                 .optional()?;
             match existing {
-                None => insert_participant(&conn, &id, form.name.trim(), &mut edit_tokens)?,
                 Some((existing_pid, Some(ref db_tok)))
                     if edit_tokens.get(&existing_pid) == Some(db_tok) =>
                 {
-                    existing_pid
+                    Some(existing_pid)
                 }
-                Some(_) => insert_participant(&conn, &id, form.name.trim(), &mut edit_tokens)?,
+                _ => None,
             }
         };
 
-        // Reset and re-insert availabilities
+        let pid = match editable_pid {
+            Some(pid) => {
+                conn.execute(
+                    "UPDATE participants SET name = ?1 WHERE id = ?2",
+                    rusqlite::params![name, pid],
+                )?;
+                pid
+            }
+            None => {
+                let count: usize = conn.query_row(
+                    "SELECT COUNT(*) FROM participants WHERE meeting_id = ?1",
+                    rusqlite::params![id],
+                    |row| row.get(0),
+                )?;
+                if count >= MAX_PARTICIPANTS_PER_MEETING {
+                    return Ok((
+                        StatusCode::UNPROCESSABLE_ENTITY,
+                        format!("meeting already has {MAX_PARTICIPANTS_PER_MEETING} participants"),
+                    )
+                        .into_response());
+                }
+                insert_participant(&conn, &id, name, &mut edit_tokens)?
+            }
+        };
+
+        // Reset and re-insert availabilities, ignoring slots from other meetings
         conn.execute(
             "DELETE FROM availabilities WHERE participant_id = ?1",
             rusqlite::params![pid],
         )?;
-        for slot_id in &form.slot_ids {
-            conn.execute(
-                "INSERT OR IGNORE INTO availabilities (participant_id, slot_id) VALUES (?1, ?2)",
-                rusqlite::params![pid, slot_id],
+        {
+            let mut stmt = conn.prepare(
+                "INSERT OR IGNORE INTO availabilities (participant_id, slot_id)
+                 SELECT ?1, id FROM time_slots WHERE id = ?2 AND meeting_id = ?3",
             )?;
+            for slot_id in &form.slot_ids {
+                stmt.execute(rusqlite::params![pid, slot_id, id])?;
+            }
         }
+        conn.commit()?;
     }
 
     let cookie_header = build_set_cookie_header(&id, &edit_tokens);
@@ -269,39 +311,61 @@ pub fn load_meeting_view(
     id: &str,
     editable_ids: &HashSet<i64>,
 ) -> Result<Option<MeetingView>, AppError> {
-    let conn = db.lock().unwrap();
+    // Only hold the shared connection while querying; build the view after releasing it.
+    let (meeting, mut slots, participants, availabilities) = {
+        let conn = db.lock().unwrap();
 
-    let Some(meeting) = conn
-        .query_row(
-            "SELECT id, title, created_at FROM meetings WHERE id = ?1",
-            rusqlite::params![id],
-            |row| {
-                Ok(Meeting {
+        let Some(meeting) = conn
+            .query_row(
+                "SELECT id, title, created_at FROM meetings WHERE id = ?1",
+                rusqlite::params![id],
+                |row| {
+                    Ok(Meeting {
+                        id: row.get(0)?,
+                        title: row.get(1)?,
+                        created_at: row.get(2)?,
+                    })
+                },
+            )
+            .optional()?
+        else {
+            return Ok(None);
+        };
+
+        let mut stmt = conn.prepare(
+            "SELECT id, meeting_id, label, slot_dt FROM time_slots WHERE meeting_id = ?1 ORDER BY slot_dt",
+        )?;
+        let slots: Vec<TimeSlot> = stmt
+            .query_map(rusqlite::params![id], |row| {
+                Ok(TimeSlot {
                     id: row.get(0)?,
-                    title: row.get(1)?,
-                    created_at: row.get(2)?,
+                    meeting_id: row.get(1)?,
+                    label: row.get(2)?,
+                    slot_dt: row.get(3)?,
+                    show_date: false,
                 })
-            },
-        )
-        .optional()?
-    else {
-        return Ok(None);
-    };
+            })?
+            .collect::<Result<_, _>>()?;
 
-    let mut stmt = conn.prepare(
-        "SELECT id, meeting_id, label, slot_dt FROM time_slots WHERE meeting_id = ?1 ORDER BY slot_dt",
-    )?;
-    let mut slots: Vec<TimeSlot> = stmt
-        .query_map(rusqlite::params![id], |row| {
-            Ok(TimeSlot {
-                id: row.get(0)?,
-                meeting_id: row.get(1)?,
-                label: row.get(2)?,
-                slot_dt: row.get(3)?,
-                show_date: false,
-            })
-        })?
-        .collect::<Result<_, _>>()?;
+        let mut stmt =
+            conn.prepare("SELECT id, name FROM participants WHERE meeting_id = ?1 ORDER BY id")?;
+        let participants: Vec<(i64, String)> = stmt
+            .query_map(rusqlite::params![id], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<Result<_, _>>()?;
+
+        let mut stmt = conn.prepare(
+            "SELECT a.participant_id, a.slot_id FROM availabilities a
+             JOIN participants p ON p.id = a.participant_id
+             WHERE p.meeting_id = ?1",
+        )?;
+        let availabilities: Vec<(i64, i64)> = stmt
+            .query_map(rusqlite::params![id], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<Result<_, _>>()?;
+
+        (meeting, slots, participants, availabilities)
+    };
 
     // Mark slots that share a label with another slot so the date number can be shown.
     // If any slot needs disambiguation, show dates on all slots for consistency.
@@ -314,42 +378,28 @@ pub fn load_meeting_view(
         slot.show_date = any_duplicate;
     }
 
-    let mut stmt =
-        conn.prepare("SELECT id, name FROM participants WHERE meeting_id = ?1 ORDER BY id")?;
-    let participants: Vec<(i64, String)> = stmt
-        .query_map(rusqlite::params![id], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-        })?
-        .collect::<Result<_, _>>()?;
+    let slot_index: HashMap<i64, usize> =
+        slots.iter().enumerate().map(|(i, s)| (s.id, i)).collect();
+    let row_index: HashMap<i64, usize> = participants
+        .iter()
+        .enumerate()
+        .map(|(i, (pid, _))| (*pid, i))
+        .collect();
 
-    let mut grid = Vec::new();
-    for (pid, name) in &participants {
-        let mut availability = vec![false; slots.len()];
-        let mut stmt =
-            conn.prepare("SELECT slot_id FROM availabilities WHERE participant_id = ?1")?;
-        let avail_slots: Vec<i64> = stmt
-            .query_map(rusqlite::params![pid], |row| row.get(0))?
-            .collect::<Result<_, _>>()?;
-
-        for (i, slot) in slots.iter().enumerate() {
-            if avail_slots.contains(&slot.id) {
-                availability[i] = true;
-            }
-        }
-        grid.push(GridRow {
-            participant_id: *pid,
-            participant_name: name.clone(),
-            availability,
-            editable: editable_ids.contains(pid),
-        });
-    }
-
+    let mut grid: Vec<GridRow> = participants
+        .into_iter()
+        .map(|(pid, name)| GridRow {
+            participant_id: pid,
+            participant_name: name,
+            availability: vec![false; slots.len()],
+            editable: editable_ids.contains(&pid),
+        })
+        .collect();
     let mut slot_counts = vec![0usize; slots.len()];
-    for row in &grid {
-        for (i, &avail) in row.availability.iter().enumerate() {
-            if avail {
-                slot_counts[i] += 1;
-            }
+    for (pid, slot_id) in availabilities {
+        if let (Some(&row), Some(&col)) = (row_index.get(&pid), slot_index.get(&slot_id)) {
+            grid[row].availability[col] = true;
+            slot_counts[col] += 1;
         }
     }
 

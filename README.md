@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # beet-scheduler
 
+![Made with AI. Quality!](./docs/made-with-ai.gif)
+
 Vibecoded site for scheduling polls.
 
 ![Screenshot of the meeting creation view with a calendar for picking the meeting dates.](./docs/screenshot.png)

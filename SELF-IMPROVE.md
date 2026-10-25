@@ -1,0 +1,3 @@
+# Self-improvement todo
+
+- [ ] (1x) **Let the Playwright MCP view local scratch files.** It refuses `file://` URLs, and it can only save screenshots under the repo (`.playwright-mcp/`). Previewing anything generated in the scratchpad meant starting a background `python3 -m http.server`, waiting for it to come up, writing screenshots into the repo, and deleting `.playwright-mcp/` afterwards, which cost several extra turns per check. Fix: add the scratchpad/tmp directory to the Playwright MCP's allowed roots and allow `file:` (plugin config), or add `.playwright-mcp/` to `.gitignore` and document a `just preview <dir>` recipe that serves a directory on a fixed port.

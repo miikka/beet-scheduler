@@ -47,7 +47,7 @@ minijinja with `path_loader` from the project root. Templates in `templates/`, p
 
 ### Testing
 
-Integration tests in `tests/integration.rs` use a `spawn_app()` helper that creates a temp DB and starts the server on a random port. Tests use reqwest (with `rustls-tls`, no OpenSSL dependency).
+Integration tests in `tests/integration.rs` use a `spawn_app()` helper that creates a temp DB and starts the server on a random port. Tests use reqwest with no TLS backend (plain HTTP to localhost only, so no OpenSSL or rustls dependency).
 
 ## Known issues
 

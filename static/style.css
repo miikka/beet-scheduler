@@ -19,8 +19,30 @@
   --yes-text:  #166534;
   --no-bg:     #fef9c3;
   --no-text:   #854d0e;
+  --hover-bg:  #f0f9df;
+  --error:     #b91c1c;
+  --focus-ring: rgba(101,163,13,.15);
   --radius:    8px;
   --shadow:    0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:        #1a1a18;
+    --surface:   #252522;
+    --border:    #3a3935;
+    --text:      #e7e5e2;
+    --muted:     #a3a19c;
+    --yes-bg:    #14361f;
+    --yes-text:  #86efac;
+    --no-bg:     #3a2f0b;
+    --no-text:   #fde68a;
+    --hover-bg:  #263317;
+    --error:     #f87171;
+    --focus-ring: rgba(132,204,22,.25);
+    --shadow:    0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+  }
 }
 
 body {
@@ -66,6 +88,7 @@ body {
 .site-footer a:focus-visible {
   opacity: 1;
 }
+.site-footer picture,
 .site-footer img {
   display: block;
 }
@@ -112,7 +135,8 @@ label {
 }
 
 input[type="text"],
-input[type="datetime-local"] {
+input[type="datetime-local"],
+input[type="time"] {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: .5rem .75rem;
@@ -125,10 +149,11 @@ input[type="datetime-local"] {
 }
 
 input[type="text"]:focus,
-input[type="datetime-local"]:focus {
+input[type="datetime-local"]:focus,
+input[type="time"]:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(101,163,13,.15);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 /* ── Slot rows ────────────────────────────────── */
@@ -195,7 +220,7 @@ input[type="datetime-local"]:focus {
 
 .checkbox-label:hover {
   border-color: var(--accent);
-  background: #f0f9df;
+  background: var(--hover-bg);
 }
 
 .checkbox-label input[type="checkbox"] {
@@ -320,7 +345,7 @@ button.cal-day:hover:not(:disabled) { background: var(--border); }
 
 .label-optional { font-weight: 400; color: var(--muted); font-size: .85em; }
 .field-hint { font-size: .82rem; color: var(--muted); margin-top: .3rem; }
-.field-error { font-size: .82rem; color: #b91c1c; margin-top: .3rem; }
+.field-error { font-size: .82rem; color: var(--error); margin-top: .3rem; }
 
 @media (max-width: 540px) {
   .calendar-grid { grid-template-columns: 1fr; }

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="88" height="31" viewBox="0 0 88 31">
+  <rect x="0.5" y="0.5" width="87" height="30" fill="#1c1c1a" stroke="#ddd"/>
+  <rect x="2.5" y="2.5" width="83" height="26" fill="none" stroke="#3a3935"/>
+  <!-- Beet, from favicon.svg -->
+  <g transform="translate(3 3.5) scale(0.7)">
+    <ellipse cx="11" cy="10" rx="4.5" ry="7" fill="#65a30d" transform="rotate(-25 11 10)"/>
+    <ellipse cx="21" cy="10" rx="4.5" ry="7" fill="#65a30d" transform="rotate(25 21 10)"/>
+    <ellipse cx="16" cy="9" rx="3.5" ry="7" fill="#4d7c0f"/>
+    <circle cx="16" cy="21" r="9" fill="#be185d"/>
+    <ellipse cx="13" cy="18" rx="2.5" ry="1.8" fill="#fce7f3" opacity="0.6"/>
+    <path d="M16 30 Q18.5 33 21 31.5" stroke="#9d174d" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  </g>
+  <g font-family="Verdana, Geneva, sans-serif" fill="#eee">
+    <text x="25" y="13" font-size="7" fill="#999" letter-spacing="0.3">powered by</text>
+    <text x="25" y="23.5" font-size="8" font-weight="bold" textLength="58" lengthAdjust="spacingAndGlyphs"><tspan fill="#ec4899">beet</tspan>-scheduler</text>
+  </g>
+</svg>

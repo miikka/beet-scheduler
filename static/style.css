@@ -55,9 +55,19 @@ body {
 
 .site-footer {
   text-align: center;
-  padding: 2rem;
-  font-size: .85rem;
-  color: var(--text-muted, #888);
+  padding: 1rem 2rem 2rem;
+}
+.site-footer a {
+  display: inline-block;
+  opacity: .6;
+  transition: opacity .2s;
+}
+.site-footer a:hover,
+.site-footer a:focus-visible {
+  opacity: 1;
+}
+.site-footer img {
+  display: block;
 }
 
 /* ── Layout ───────────────────────────────────── */

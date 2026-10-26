@@ -24,7 +24,9 @@ SPDX-License-Identifier: MIT
   <main>
     {% block content %}{% endblock %}
   </main>
-  <footer class="site-footer">Powered by <a href="https://github.com/miikka/beet-scheduler">beet-scheduler</a></footer>
+  <footer class="site-footer">
+    <a href="https://github.com/miikka/beet-scheduler"><img src="/static/powered-by.svg" width="88" height="31" alt="Powered by beet-scheduler"></a>
+  </footer>
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   {% block scripts %}{% endblock %}
   {{ html_snippet | safe }}
